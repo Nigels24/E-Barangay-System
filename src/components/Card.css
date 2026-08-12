@@ -1,0 +1,27 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-card);
+  margin-bottom: var(--space-6);
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 var(--space-1);
+}
+
+.card-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 var(--space-4);
+}
+
+/* The prototype's `.card h2` carries no bottom margin of its own when a
+   subtitle follows it; with no subtitle the heading needs the gap instead. */
+.card-title:last-child {
+  margin-bottom: 0;
+}

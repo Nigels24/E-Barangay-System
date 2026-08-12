@@ -1,0 +1,60 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-5);
+  font-size: 14px;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+.btn-dark {
+  background: var(--ink);
+  color: #fff;
+}
+.btn-dark:hover:not(:disabled) {
+  background: var(--primary);
+}
+.btn-dark:disabled {
+  background: var(--border-soft);
+  color: var(--disabled-ink);
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+/* 9px/14px are off the 4px grid, but they are the prototype's approved
+   small-button metrics — kept exact rather than rounded onto the scale. */
+.btn-sm {
+  padding: 9px 14px;
+  font-size: 13px;
+  border-radius: var(--radius-md);
+}
+
+/* The prototype only spells out a disabled state for the dark button. The
+   other two get the same treatment so a disabled control never looks live. */
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.btn-dark:disabled {
+  opacity: 1;
+}

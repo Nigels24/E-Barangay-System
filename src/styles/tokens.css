@@ -1,0 +1,78 @@
+/**
+ * Design tokens for eBarangay Books.
+ *
+ * The palette is lifted verbatim from the client-approved prototype
+ * (`Ebarangay Prototype.html`). Do not retune these values — the client has
+ * already signed off on this look; changing a hex here changes an approved
+ * design.
+ *
+ * Everything else in the app should reference these variables rather than
+ * hard-coding a colour, a gap, or a corner radius.
+ */
+
+:root {
+  /* ---- Palette (verbatim from the prototype) ---- */
+  --primary: #0f6b5c;
+  --primary-dark: #0b4f44;
+  --primary-tint: #e8f5f1;
+  --gold: #c9a227;
+  --gold-ink: #a9821b;
+  --gold-tint: #fbf6e8;
+  --ink: #16211d;
+  --muted: #5b6b65;
+  --faint: #8a9994;
+  --border: #e1e8e4;
+  --border-soft: #f0f3f1;
+  --bg: #f5f7f6;
+  --surface: #ffffff;
+
+  /* Two further literals the prototype uses inline: the subtle surface behind
+     table rows / footers, and the ink of a disabled dark button. Named here so
+     they stop being magic hexes scattered through component CSS. */
+  --surface-subtle: #fafbfa;
+  --disabled-ink: #b7c2bd;
+
+  /* ---- Typography ----
+     NO WEB FONTS. The prototype pulls Sora / Inter / IBM Plex Mono from the
+     Google Fonts CDN. This app runs offline on a single City Accounting
+     Office PC with no internet, where that request fails silently and the
+     entire UI falls back to Times New Roman. Use the system stacks below.
+     Do not re-add that font import. If a brand face is ever wanted, it must
+     be bundled as a local file, never fetched at runtime. */
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  /* The prototype's display face (Sora) collapses to the UI stack for the same
+     offline reason. Kept as its own token so headings can be re-pointed at a
+     bundled display font later without touching every rule. */
+  --font-display: var(--font-ui);
+
+  /* ---- Spacing scale (4px base, with half-steps the prototype actually uses) ---- */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ---- Radius scale ---- */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* ---- Elevation (both taken from the prototype's shadows) ---- */
+  --shadow-sm: 0 1px 2px rgba(15, 42, 35, 0.08);
+  --shadow-card: 0 1px 3px rgba(15, 42, 35, 0.05);
+
+  /* ---- Layout ---- */
+  --content-max: 960px;
+
+  /* ---- Motion ---- */
+  --transition: 0.15s;
+}
