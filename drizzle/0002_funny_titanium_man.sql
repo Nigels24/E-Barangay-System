@@ -1,0 +1,1 @@
+ALTER TABLE `account` ADD `is_provisional_code` integer DEFAULT false NOT NULL;

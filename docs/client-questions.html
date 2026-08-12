@@ -1,0 +1,730 @@
+<title>eBarangay Books — Questions for the City Accounting Office</title>
+<style>
+  :root {
+    --ground: #F2F5F3;
+    --surface: #FFFFFF;
+    --surface-sunk: #F7FAF8;
+    --ink: #16211D;
+    --muted: #55655F;
+    --faint: #85948E;
+    --line: #DDE6E1;
+    --line-soft: #EAF0ED;
+    --primary: #0F6B5C;
+    --primary-deep: #0B4F44;
+    --primary-wash: #E6F2EE;
+    --gold: #8F6D12;
+    --gold-wash: #FAF3E0;
+    --gold-line: #E2CE97;
+    --shadow: 0 1px 2px rgba(15,42,35,.05), 0 8px 24px -16px rgba(15,42,35,.25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1310;
+      --surface: #151F1B;
+      --surface-sunk: #111A16;
+      --ink: #E7EFEB;
+      --muted: #9CABA5;
+      --faint: #74837D;
+      --line: #253330;
+      --line-soft: #1D2925;
+      --primary: #5CC4AC;
+      --primary-deep: #7FD8C3;
+      --primary-wash: #16302A;
+      --gold: #D6B155;
+      --gold-wash: #251F10;
+      --gold-line: #4A3D1C;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1310;
+    --surface: #151F1B;
+    --surface-sunk: #111A16;
+    --ink: #E7EFEB;
+    --muted: #9CABA5;
+    --faint: #74837D;
+    --line: #253330;
+    --line-soft: #1D2925;
+    --primary: #5CC4AC;
+    --primary-deep: #7FD8C3;
+    --primary-wash: #16302A;
+    --gold: #D6B155;
+    --gold-wash: #251F10;
+    --gold-line: #4A3D1C;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .serif {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
+  }
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page { max-width: 60rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+
+  /* ---------- masthead ---------- */
+  header.masthead {
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 2rem;
+    margin-bottom: 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .eyebrow {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    font-weight: 600;
+    color: var(--primary);
+  }
+  header.masthead h1 {
+    margin: 0;
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.12;
+    font-weight: 600;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+  }
+  .standfirst {
+    margin: 0;
+    max-width: 46rem;
+    font-size: 1.0625rem;
+    color: var(--muted);
+  }
+  .meta-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.75rem;
+    padding-top: .5rem;
+    font-size: .8125rem;
+    color: var(--faint);
+  }
+  .meta-strip span { display: inline-flex; gap: .4rem; }
+  .meta-strip b { color: var(--muted); font-weight: 600; }
+
+  /* ---------- legend ---------- */
+  .legend {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: .75rem;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 3.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: .875rem;
+    box-shadow: var(--shadow);
+  }
+  .legend h2 {
+    margin: 0;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--faint);
+    font-weight: 600;
+  }
+  .legend ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .625rem; }
+  .legend li { display: flex; gap: .875rem; align-items: baseline; font-size: .9375rem; color: var(--muted); }
+
+  .chip {
+    flex-shrink: 0;
+    display: inline-block;
+    font-size: .625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    padding: .25rem .5rem;
+    border-radius: .25rem;
+    white-space: nowrap;
+  }
+  .chip.blocks { background: var(--primary); color: var(--surface); }
+  .chip.golive { background: var(--gold-wash); color: var(--gold); border: 1px solid var(--gold-line); }
+  .chip.confirm { background: transparent; color: var(--faint); border: 1px solid var(--line); }
+
+  /* ---------- sections ---------- */
+  section { margin-bottom: 3.5rem; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: .875rem;
+    padding-bottom: .75rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .section-head h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .section-head .count {
+    margin-left: auto;
+    font-size: .8125rem;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  /* ---------- questions ---------- */
+  .q { display: grid; grid-template-columns: 3.25rem 1fr; gap: 0 1.25rem; margin-bottom: 2.25rem; }
+  .q-num {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--primary);
+    padding-top: .1rem;
+  }
+  .q-body { display: flex; flex-direction: column; gap: .625rem; min-width: 0; }
+  .q-text { margin: 0; font-size: 1.0625rem; font-weight: 500; line-height: 1.45; text-wrap: pretty; }
+  .q-why { margin: 0; font-size: .9375rem; color: var(--muted); }
+  .q-why b { color: var(--ink); font-weight: 600; }
+
+  .evidence {
+    background: var(--surface-sunk);
+    border: 1px solid var(--line-soft);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 .5rem .5rem 0;
+    padding: .875rem 1.125rem;
+    font-size: .875rem;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: .375rem;
+  }
+  .evidence .src {
+    font-size: .6875rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--faint);
+    font-weight: 600;
+  }
+  .evidence .mono { color: var(--ink); font-size: .8125rem; }
+
+  .fig-table { width: 100%; border-collapse: collapse; font-size: .8125rem; margin-top: .25rem; }
+  .fig-table td { padding: .25rem .75rem .25rem 0; border: 0; }
+  .fig-table td.num { text-align: right; color: var(--ink); }
+
+  .table-scroll { overflow-x: auto; }
+
+  .answer-line {
+    margin-top: .25rem;
+    border-bottom: 1px dashed var(--line);
+    height: 1.75rem;
+  }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--line);
+    font-size: .875rem;
+    color: var(--faint);
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+
+  @media (max-width: 34rem) {
+    .q { grid-template-columns: 1fr; gap: .5rem; }
+    .q-num { padding-top: 0; }
+  }
+
+  @media print {
+    body { background: #fff; }
+    .q { break-inside: avoid; }
+    .legend { break-inside: avoid; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">eBarangay Books &middot; Requirements</div>
+    <h1 class="serif">Questions for the City Accounting Office</h1>
+    <p class="standfirst">
+      Everything below comes from reading the four workbooks and the annotated Trial Balance
+      printout. Each question names the evidence behind it, so it can be answered without
+      re-deriving the context. The answers to the first group determine how the system is
+      built, not just how it looks.
+    </p>
+    <div class="meta-strip">
+      <span><b>Subject</b> Barangay Upper Sibatang, FY 2023</span>
+      <span><b>Sources</b> 4 workbooks, 2 annotated printouts</span>
+      <span><b>Questions</b> 28</span>
+    </div>
+  </header>
+
+  <div class="legend">
+    <h2>How to read the markers</h2>
+    <ul>
+      <li><span class="chip blocks">Blocks build</span><span>I cannot build that part correctly until this is answered. These are worth asking first.</span></li>
+      <li><span class="chip golive">Before go&#8209;live</span><span>Building can proceed on a documented assumption, but the answer is needed before real data is entered.</span></li>
+      <li><span class="chip confirm">Confirm</span><span>There is a safe default. Answering only changes a setting, not the design.</span></li>
+    </ul>
+  </div>
+
+  <!-- ============ 1. BANK RECONCILIATION ============ -->
+  <section>
+    <div class="section-head">
+      <h2 class="serif">Bank Reconciliation Statement</h2>
+      <span class="count">Questions 1&ndash;10</span>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">01</div>
+      <div class="q-body">
+        <span class="chip blocks" style="align-self:flex-start">Blocks build</span>
+        <p class="q-text">Does every barangay submit a Bank Reconciliation Statement every month, and is it required by COA?</p>
+        <p class="q-why">This decides whether the reconciliation is built into the first version or added later. <b>If it is a monthly statutory requirement, it should be designed in now</b> &mdash; adding it after the ledger is finished means reworking the ledger.</p>
+        <div class="evidence">
+          <span class="src">Found in TB2023US.xlsx</span>
+          <span>Twelve complete statements, <span class="mono">br(jan)</span> through <span class="mono">br(dec)</span> &mdash; unadjusted book and bank balances, reconciling items, adjusted balance, and two signatories.</span>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">02</div>
+      <div class="q-body">
+        <span class="chip blocks" style="align-self:flex-start">Blocks build</span>
+        <p class="q-text">How many bank accounts does one barangay have?</p>
+        <p class="q-why">The books show a single <span class="mono">Cash in Bank</span>, but barangays often keep separate SK and Trust Fund accounts. <b>One account per barangay is a single field; several accounts needs its own table</b> &mdash; and that is difficult to change afterwards.</p>
+        <div class="evidence">
+          <span class="src">Found in TB2023US.xlsx &middot; sheet &ldquo;dec&rdquo;</span>
+          <span>Only one bank account appears: <span class="mono">1-01-02-010 Cash in Bank &mdash; 2,491,080.10</span></span>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">03</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Where does the bank balance come from &mdash; typed in from a paper bank statement, or a file from the bank?</p>
+        <p class="q-why">The system runs entirely offline with no internet, so a bank feed is not possible. Confirming that the balance is keyed in by hand means the screen can be designed around fast, accurate typing.</p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">04</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Is the list of reconciling item types fixed by COA, or can the bookkeeper add new ones?</p>
+        <p class="q-why">If the list is fixed, it becomes a set of labelled rows that cannot be mistyped. If it can vary, the bookkeeper needs a way to add items.</p>
+        <div class="evidence">
+          <span class="src">Template used in br(jan)&hellip;br(dec)</span>
+          <span>Checks Issued not taken up (by the Barangay / by the Bank) &middot; Checks Issued Overstated &middot; Deposit Understated &middot; Deposit Overstated &middot; Bank Debit&#47;Credit Memo &middot; Other Reconciling Item &middot; Prior Years Adjustments</span>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">05</div>
+      <div class="q-body">
+        <span class="chip blocks" style="align-self:flex-start">Blocks build</span>
+        <p class="q-text">When a reconciling item is recorded, should the system also create the journal entry for it &mdash; or does the bookkeeper post that separately?</p>
+        <p class="q-why">This is the most important question in this section. A bank service charge or interest credit has to reach the ledger somehow. <b>Either the reconciliation posts it automatically, or it stays a worksheet and the bookkeeper journalises by hand.</b> The two are built very differently, and doing both creates double entries.</p>
+        <div class="evidence">
+          <span class="src">Found in br(jan)</span>
+          <span>A <span class="mono">&minus;600.00</span> book-side credit memo annotated &ldquo;checkbook&rdquo;, and a <span class="mono">&minus;825.00</span> bank-side item annotated &ldquo;CK# 3395683 &mdash; VAT&rdquo;. The first is the kind of item that normally needs a journal entry.</span>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">06</div>
+      <div class="q-body">
+        <span class="chip blocks" style="align-self:flex-start">Blocks build</span>
+        <p class="q-text">Should the system track each check as issued and then cleared, carrying unpresented checks forward automatically each month?</p>
+        <p class="q-why">The Check Disbursement Journal already records check numbers. <b>If outstanding checks should carry forward on their own, every check disbursement needs a check number, check date and cleared date</b> &mdash; which changes that entry screen. If the bookkeeper prefers to list them manually each month, the entry screen stays simple.</p>
+        <div class="evidence">
+          <span class="src">Found in UpperSibatangJV2023.xlsx &middot; Check Disbursement Journal</span>
+          <span class="mono">w/ CK# 3869301 (02/01/23) &nbsp;&middot;&nbsp; w/ CK# 3869302 (02/01/23)</span>
+          <span>Check numbers are written inside the particulars text rather than in their own column.</span>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">07</div>
+      <div class="q-body">
+        <span class="chip confirm" style="align-self:flex-start">Confirm</span>
+        <p class="q-text">Must the adjusted book balance always equal the Cash in Bank balance in the general ledger for that month &mdash; and if they differ, should the system block the reconciliation or simply warn?</p>
+        <p class="q-why">Blocking guarantees the two never disagree. Warning lets the bookkeeper save a half-finished reconciliation and come back to it. Most offices prefer a warning.</p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">08</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Which designation is current for the preparer &mdash; and does it change from one report to another?</p>
+        <p class="q-why">The same person appears with two different titles across the reports. The system stores signatories per report so this is easy to set, but it needs the correct current value.</p>
+        <div class="evidence">
+          <span class="src">Two different titles in the same workbook</span>
+          <div class="table-scroll">
+            <table class="fig-table">
+              <tr><td>Bank Reconciliation</td><td class="mono">EUGENIE M. MANOSUR &mdash; Brgy. Bookkeeper</td></tr>
+              <tr><td>Trial Balance</td><td class="mono">EUGENIE M. MANOSUR &mdash; RCC II</td></tr>
+              <tr><td>Schedule of Fixed Assets</td><td class="mono">EUGENIE M. MANOSUR &mdash; Bookkeeper</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">09</div>
+      <div class="q-body">
+        <span class="chip confirm" style="align-self:flex-start">Confirm</span>
+        <p class="q-text">The January reconciliation inside the 2023 workbook is dated 31 January 2022. Is that a typing error, or do the reconciliation sheets run a year behind the rest of the file?</p>
+        <p class="q-why">Worth clarifying before any of this data is carried into the new system, so a year-old figure is not brought forward as an opening balance.</p>
+        <div class="evidence">
+          <span class="src">TB2023US.xlsx &middot; sheet &ldquo;br(jan)&rdquo;</span>
+          <span class="mono">Bank Reconciliation Statement &mdash; Barangay Upper Sibatang &mdash; 2022-01-31</span>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">10</div>
+      <div class="q-body">
+        <span class="chip confirm" style="align-self:flex-start">Confirm</span>
+        <p class="q-text">Are bank reconciliations needed for past years too, or only from the day the system goes live?</p>
+        <p class="q-why">Only affects how much historical data has to be entered at setup.</p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. CHART OF ACCOUNTS ============ -->
+  <section>
+    <div class="section-head">
+      <h2 class="serif">Chart of Accounts</h2>
+      <span class="count">Questions 11&ndash;15</span>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">11</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">One account code is being used for two different accounts. What is the correct code for Auditing Services Expense?</p>
+        <p class="q-why">The new system will not allow one code to mean two things &mdash; that is what keeps the reports trustworthy. <b>One of these two needs a different code before the accounts can be set up.</b></p>
+        <div class="evidence">
+          <span class="src">TB2023US.xlsx &middot; sheet &ldquo;dec&rdquo;</span>
+          <div class="table-scroll">
+            <table class="fig-table">
+              <tr><td class="mono">5-02-01-010</td><td>Travelling Expense</td><td class="num mono">800.00</td></tr>
+              <tr><td class="mono">5-02-01-010</td><td>Auditing Services Expense</td><td class="num mono">4,000.00</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">12</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Five accounts in the December trial balance have no account code. What codes should they carry?</p>
+        <p class="q-why">Every account in the new system needs a code, because the ledger and all reports are grouped by it.</p>
+        <div class="evidence">
+          <span class="src">TB2023US.xlsx &middot; sheet &ldquo;dec&rdquo;</span>
+          <div class="table-scroll">
+            <table class="fig-table">
+              <tr><td>Community Tax</td><td class="num mono">4,440.00</td><td>credit</td></tr>
+              <tr><td>Year End Bonus</td><td class="num mono">34,500.00</td><td>debit</td></tr>
+              <tr><td>Transfer of SK Allocation</td><td class="num mono">416,066.68</td><td>debit</td></tr>
+              <tr><td>Depreciation Expense</td><td class="num mono">76,281.73</td><td>debit</td></tr>
+              <tr><td>Accumulated Depreciation <span style="color:var(--faint)">(under Disaster Response &amp; Rescue Equipment)</span></td><td class="num mono">6,840.00</td><td>credit</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">13</div>
+      <div class="q-body">
+        <span class="chip confirm" style="align-self:flex-start">Confirm</span>
+        <p class="q-text">The books record &ldquo;Share from IRA&rdquo;. Since 2022 this has been renamed the National Tax Allotment. Should new entries use the new name and code &mdash; and should the 2023 records be relabelled or left as they are?</p>
+        <p class="q-why">Historical records are normally left exactly as filed. This is only to confirm what new entries should use going forward.</p>
+        <div class="evidence">
+          <span class="src">TB2023US.xlsx &middot; sheet &ldquo;dec&rdquo;</span>
+          <span class="mono">4-04-04-010 &nbsp; Share from IRA &nbsp; 2,521,900.00</span>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">14</div>
+      <div class="q-body">
+        <span class="chip confirm" style="align-self:flex-start">Confirm</span>
+        <p class="q-text">Should the system include the complete Revised Chart of Accounts for local government units, or only the accounts these barangays actually use?</p>
+        <p class="q-why">The full list is safer for the future but longer to scroll through. Roughly 50 accounts appear in the 2023 books. A good middle option is to load the full list but hide the unused ones until they are needed.</p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">15</div>
+      <div class="q-body">
+        <span class="chip blocks" style="align-self:flex-start">Blocks build</span>
+        <p class="q-text">Do all 54 barangays use one identical chart of accounts, or can a barangay have accounts the others do not?</p>
+        <p class="q-why">One shared list means a correction made once applies everywhere. Per-barangay lists mean 54 separate lists to maintain. <b>This affects the structure of the database and is expensive to change later.</b></p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. VOUCHER NUMBERING ============ -->
+  <section>
+    <div class="section-head">
+      <h2 class="serif">Voucher Numbering</h2>
+      <span class="count">Questions 16&ndash;18</span>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">16</div>
+      <div class="q-body">
+        <span class="chip blocks" style="align-self:flex-start">Blocks build</span>
+        <p class="q-text">What is the correct voucher number format &mdash; and should the system generate it automatically?</p>
+        <p class="q-why">The four books currently show four different patterns, including two that appear to carry an old year. <b>Automatic numbering prevents duplicates and gaps, which is what an auditor looks for</b> &mdash; but it needs one agreed format.</p>
+        <div class="evidence">
+          <span class="src">UpperSibatangJV2023.xlsx &middot; header of each book</span>
+          <div class="table-scroll">
+            <table class="fig-table">
+              <tr><td>General Journal</td><td class="mono">No. 22-01-001</td></tr>
+              <tr><td>Cash Receipts Journal</td><td class="mono">No. 2023-01-012</td></tr>
+              <tr><td>Check Disbursement Journal</td><td class="mono">No. 18-03-003</td></tr>
+              <tr><td>Cash Disbursement Journal</td><td class="mono">No. 2023-04-004</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">17</div>
+      <div class="q-body">
+        <span class="chip blocks" style="align-self:flex-start">Blocks build</span>
+        <p class="q-text">Does the number restart at 001 each year, or each month &mdash; and is the sequence separate for each book and each barangay?</p>
+        <p class="q-why">Needed to generate numbers correctly. With 54 barangays sharing one system, a sequence that is not separated per barangay will collide.</p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">18</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Should check number and check date be required on every check disbursement?</p>
+        <p class="q-why">They are currently written inside the description text, which means they cannot be searched or matched against the bank. Giving them their own fields makes both possible &mdash; and is required if the answer to question 6 is yes.</p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. FIXED ASSETS ============ -->
+  <section>
+    <div class="section-head">
+      <h2 class="serif">Fixed Assets &amp; Depreciation</h2>
+      <span class="count">Questions 19&ndash;22</span>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">19</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">The Schedule of Fixed Assets uses the old account numbers while the Trial Balance uses the current ones. Should everything be converted to the current codes?</p>
+        <div class="evidence">
+          <span class="src">Com2023US.xl.xlsx &middot; sheet &ldquo;FA&rdquo;</span>
+          <div class="table-scroll">
+            <table class="fig-table">
+              <tr><td class="mono">211</td><td>Office Building</td><td class="mono" style="color:var(--faint)">&rarr; 1-07-04-010</td></tr>
+              <tr><td class="mono">215</td><td>Other Structures</td><td class="mono" style="color:var(--faint)">&rarr; 1-07-04-990</td></tr>
+              <tr><td class="mono">221</td><td>Office Equipment</td><td class="mono" style="color:var(--faint)">&rarr; 1-07-05-020</td></tr>
+              <tr><td class="mono">222</td><td>Furniture &amp; Fixtures</td><td class="mono" style="color:var(--faint)">&rarr; 1-07-07-010</td></tr>
+              <tr><td class="mono">223</td><td>IT Equipment</td><td class="mono" style="color:var(--faint)">&rarr; 1-07-05-030</td></tr>
+              <tr><td class="mono">250</td><td>Other Equipment</td><td class="mono" style="color:var(--faint)">&rarr; 1-07-05-990</td></tr>
+              <tr><td class="mono">254</td><td>Reservoir</td><td class="mono" style="color:var(--faint)">&rarr; 1-07-03-040</td></tr>
+            </table>
+          </div>
+          <span style="color:var(--faint)">Suggested mapping above &mdash; please confirm or correct each line.</span>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">20</div>
+      <div class="q-body">
+        <span class="chip confirm" style="align-self:flex-start">Confirm</span>
+        <p class="q-text">Is the Schedule of Fixed Assets a complete register of every asset, or a partial working list?</p>
+        <p class="q-why">The schedule totals less than the trial balance for the same accounts. If it is a complete register the difference needs explaining; if it is a working list, the full register will be built from scratch at setup. <b>Either answer is fine &mdash; the system will show the difference rather than assume which figure is right.</b></p>
+        <div class="evidence">
+          <span class="src">Com2023US.xl.xlsx &ldquo;FA&rdquo; compared with TB2023US.xlsx &ldquo;dec&rdquo;</span>
+          <div class="table-scroll">
+            <table class="fig-table">
+              <tr><td></td><td class="num mono" style="color:var(--faint)">schedule</td><td class="num mono" style="color:var(--faint)">trial balance</td></tr>
+              <tr><td>Buildings</td><td class="num mono">524,334.02</td><td class="num mono">608,144.80</td></tr>
+              <tr><td>Other Structures</td><td class="num mono">386,172.19</td><td class="num mono">871,918.71</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">21</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Is depreciation always straight&#8209;line on 90&#37; of cost, with 10&#37; residual value &mdash; or do some asset classes use a different rate or method?</p>
+        <p class="q-why">That formula reproduces the client&rsquo;s own figures exactly on the categories that can be checked, so it is being used as the default. Confirmation means every asset class can be relied on.</p>
+        <div class="evidence">
+          <span class="src">Verified against Com2023US.xl.xlsx &middot; sheet &ldquo;comp&rdquo;</span>
+          <div class="table-scroll">
+            <table class="fig-table">
+              <tr><td></td><td class="num mono" style="color:var(--faint)">cost</td><td class="num mono" style="color:var(--faint)">life</td><td class="num mono" style="color:var(--faint)">your figure</td><td class="num mono" style="color:var(--faint)">cost&times;0.9&divide;life</td></tr>
+              <tr><td>Other Equipment</td><td class="num mono">87,784.51</td><td class="num">10</td><td class="num mono">7,900.61</td><td class="num mono">7,900.61</td></tr>
+              <tr><td>IT Equipment</td><td class="num mono">35,000.00</td><td class="num">7</td><td class="num mono">4,500.00</td><td class="num mono">4,500.00</td></tr>
+              <tr><td>Office Building</td><td class="num mono">608,144.80</td><td class="num">30</td><td class="num mono">18,244.32</td><td class="num mono">18,244.34</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">22</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Is depreciation recorded every month, or once at year end?</p>
+        <p class="q-why">The accumulated depreciation figures move between December and January, which suggests monthly. Confirming this determines whether the system prompts for it each month or once a year.</p>
+        <div class="evidence">
+          <span class="src">Dec 2023 trial balance vs the January 2024 printout</span>
+          <div class="table-scroll">
+            <table class="fig-table">
+              <tr><td>Accum. Dep. &mdash; Water Supply</td><td class="num mono">51,841.56</td><td class="mono" style="color:var(--faint)">&rarr;</td><td class="num mono">52,454.06</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. SETUP & OPERATIONS ============ -->
+  <section>
+    <div class="section-head">
+      <h2 class="serif">Setup &amp; Daily Operation</h2>
+      <span class="count">Questions 23&ndash;28</span>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">23</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">May we have the official list of all 54 barangays, with the code the office uses for each?</p>
+        <p class="q-why">These are loaded once at setup and appear in the barangay selector on every screen.</p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">24</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Who needs a login, and what should each person be allowed to do?</p>
+        <p class="q-why">Every posted entry records who made it, so each person needs their own account. Three levels are proposed &mdash; please confirm or correct.</p>
+        <div class="evidence">
+          <span class="src">Proposed</span>
+          <div class="table-scroll">
+            <table class="fig-table">
+              <tr><td><b>Bookkeeper</b></td><td>Enters and posts vouchers, prints reports</td></tr>
+              <tr><td><b>Reviewer</b></td><td>Views and certifies reports, closes months, cannot enter vouchers</td></tr>
+              <tr><td><b>Administrator</b></td><td>Manages accounts, users, and backups</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">25</div>
+      <div class="q-body">
+        <span class="chip blocks" style="align-self:flex-start">Blocks build</span>
+        <p class="q-text">Once a month has been closed and certified, should it be locked permanently &mdash; or may an administrator reopen it?</p>
+        <p class="q-why">A permanent lock is the stronger audit position. Most offices need the ability to reopen for a late correction. <b>If reopening is allowed, it will be recorded in the audit trail with the reason.</b></p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">26</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Should the year&#8209;end closing entries be produced by the system, or prepared by the accountant as a general journal entry?</p>
+        <p class="q-why">The 2023 workbook contains a closing sheet, so the entries are currently prepared by hand. The system can generate them, but only if the office wants that.</p>
+        <div class="evidence">
+          <span class="src">UpperSibatangJV2023.xlsx</span>
+          <span>Sheet <span class="mono">clo2023</span> &mdash; closing entries for the year.</span>
+        </div>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">27</div>
+      <div class="q-body">
+        <span class="chip golive" style="align-self:flex-start">Before go&#8209;live</span>
+        <p class="q-text">Is there a USB drive or external disk the office can keep backups on, and who will be responsible for it?</p>
+        <p class="q-why"><b>This is the single largest risk in the whole project.</b> The system runs on one computer with no internet, so all 54 barangays&rsquo; books live on one hard disk. The system will back up automatically and check each backup is readable, but a copy kept on the same machine does not survive that machine failing.</p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+
+    <div class="q">
+      <div class="q-num mono">28</div>
+      <div class="q-body">
+        <span class="chip confirm" style="align-self:flex-start">Confirm</span>
+        <p class="q-text">Which computer will run the system &mdash; Windows 10 or 11, and how much memory does it have?</p>
+        <p class="q-why">The program is built to run comfortably on older office machines, but the installer needs to match the version of Windows.</p>
+        <div class="answer-line"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>Prepared from <span class="mono">UpperSibatangJV2023.xlsx</span>, <span class="mono">General LEdger US 2023.xlsx</span>, <span class="mono">TB2023US.xlsx</span>, <span class="mono">Com2023US.xl.xlsx</span>, and the two annotated printouts.</div>
+    <div>All figures quoted are from those files. Every book was checked and balances exactly &mdash; total debits equal total credits at <span class="mono">18,810,893.40</span> across all four journals.</div>
+  </footer>
+
+</div>

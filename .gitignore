@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# local SQLite databases (dev/test only — never the client's real data)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Nex multi-agent coordination files (PLAN.md, REVIEW.md, etc.).
+# Ignored so `git diff` shows only real code changes — the Reviewer reads
+# these directly from disk, not from the diff.
+.agent-comms/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
