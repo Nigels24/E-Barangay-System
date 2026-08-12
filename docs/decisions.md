@@ -224,6 +224,45 @@ in the old prototype was never evidence of anything.
 
 ---
 
+## UI and data access
+
+**D30 — The React layer reaches SQLite through a generic Rust transaction bridge.**
+
+The accounting engine (`src/lib/engine/`) is synchronous: it calls
+`db.transaction((tx) => …)`, `.get()`, `.all()`, `.run()` against the better-sqlite3
+driver. Tauri's SQL plugin is asynchronous — `execute()` and `select()` both return
+Promises — so the engine as written cannot be called from the desktop app at all.
+
+Worse, the naive fix is unsafe. Drizzle's async `sqlite-proxy` driver *does* support
+interactive transactions, but it implements them by issuing `begin`, the statements,
+and `commit` as **separate** proxy calls. `tauri-plugin-sql` v2.4.0 holds a
+`Pool<Sqlite>` (verified in its `src/wrapper.rs`), so those separate calls can be
+served by **different pooled connections** — the `BEGIN` lands on one connection and
+the writes on another. A voucher could then half-commit with no error raised. Silent
+partial writes are the single worst failure mode for a ledger that has to survive a
+COA audit, so this approach is rejected.
+
+Resolution: add one small, generic Rust command that accepts a batch of
+`(sql, params)` statements and executes them inside a single transaction on a single
+connection — all-or-nothing. All validation and business logic stays in TypeScript,
+where the 150 tests and the golden test live; the Rust side contains no accounting
+knowledge and never needs to be tested against the client's figures. Engine functions
+become `async`, which is a mechanical change to the call sites, not a redesign.
+
+Reimplementing the engine in Rust was rejected outright: it would discard the golden
+test that reproduces the client's real December 2023 trial balance to the centavo
+(₱7,790,851.41), which is the acceptance gate for the entire system.
+
+**Accepted consequence.** Reads that currently happen *inside* the transaction
+(period status, line sums, next voucher number) will happen just *before* the write
+batch is sent, leaving a theoretical time-of-check/time-of-use gap. This is
+acceptable here and nowhere near a real risk: the system is a single-user desktop
+app on one office PC (D-deployment), so there are no concurrent writers, and the
+schema's `UNIQUE` and `CHECK` constraints plus the append-only triggers backstop
+every invariant at the database level regardless.
+
+---
+
 ## Still genuinely blocked on the client
 
 Everything above is decided and buildable. These five are facts, not choices:

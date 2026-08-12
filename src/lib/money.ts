@@ -52,20 +52,45 @@ export function toCentavos(pesos: number | string): number {
 }
 
 /**
- * Formats an integer centavos amount as a peso string for display or
- * printing, e.g. `249108010 -> "₱2,491,080.10"`, `-50025 -> "-₱500.25"`.
+ * Shared core of the two output formatters: validates the input and splits it
+ * into a sign and a grouped `2,491,080.10` body. The only difference between
+ * `formatPeso` and `formatPesoPlain` is whether the ₱ symbol is prepended, so
+ * the integer/decimal split lives here once. `caller` is threaded through only
+ * so the thrown message still names the function the caller actually used.
  */
-export function formatPeso(centavos: number): string {
+function splitForDisplay(centavos: number, caller: string): { negative: boolean; body: string } {
   if (!Number.isInteger(centavos)) {
-    throw new Error(`formatPeso: ${centavos} is not an integer number of centavos`);
+    throw new Error(`${caller}: ${centavos} is not an integer number of centavos`);
   }
   const negative = centavos < 0;
   const abs = Math.abs(centavos);
   const pesos = Math.floor(abs / 100);
   const cents = abs % 100;
   const formattedPesos = pesos.toLocaleString("en-PH");
-  const formatted = `₱${formattedPesos}.${cents.toString().padStart(2, "0")}`;
+  return { negative, body: `${formattedPesos}.${cents.toString().padStart(2, "0")}` };
+}
+
+/**
+ * Formats an integer centavos amount as a peso string for display or
+ * printing, e.g. `249108010 -> "₱2,491,080.10"`, `-50025 -> "-₱500.25"`.
+ */
+export function formatPeso(centavos: number): string {
+  const { negative, body } = splitForDisplay(centavos, "formatPeso");
+  const formatted = `₱${body}`;
   return negative ? `-${formatted}` : formatted;
+}
+
+/**
+ * Same as `formatPeso` but without the ₱ symbol, e.g.
+ * `249108010 -> "2,491,080.10"`, `-50025 -> "-500.25"`.
+ *
+ * For report columns: the client's own trial balance prints bare amounts and
+ * states the currency once in the report header, rather than repeating the
+ * sign on every row.
+ */
+export function formatPesoPlain(centavos: number): string {
+  const { negative, body } = splitForDisplay(centavos, "formatPesoPlain");
+  return negative ? `-${body}` : body;
 }
 
 /** Converts centavos back to a plain peso number, e.g. for a numeric input's `value`. Not for arithmetic. */

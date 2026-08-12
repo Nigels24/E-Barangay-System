@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { toCentavos, formatPeso, centavosToPesoNumber, sumCentavos } from "../money";
+import {
+  toCentavos,
+  formatPeso,
+  formatPesoPlain,
+  centavosToPesoNumber,
+  sumCentavos,
+} from "../money";
 
 describe("toCentavos", () => {
   it("converts real client figures exactly", () => {
@@ -79,6 +85,36 @@ describe("formatPeso", () => {
 
   it("rejects non-integer input — a fractional centavo is a bug upstream", () => {
     expect(() => formatPeso(100.5)).toThrow();
+  });
+});
+
+describe("formatPesoPlain", () => {
+  it("formats real client figures without the peso sign", () => {
+    // The client's Dec 2023 trial balance prints bare amounts — the currency
+    // is stated once in the report header, not repeated on every row.
+    expect(formatPesoPlain(249108010)).toBe("2,491,080.10");
+    expect(formatPesoPlain(222900)).toBe("2,229.00");
+    expect(formatPesoPlain(7628173)).toBe("76,281.73");
+    expect(formatPesoPlain(779085141)).toBe("7,790,851.41");
+  });
+
+  it("formats zero and sub-peso amounts", () => {
+    expect(formatPesoPlain(0)).toBe("0.00");
+    expect(formatPesoPlain(5)).toBe("0.05");
+    expect(formatPesoPlain(100)).toBe("1.00");
+  });
+
+  it("formats negative amounts with a leading sign", () => {
+    expect(formatPesoPlain(-50025)).toBe("-500.25");
+  });
+
+  it("rejects non-integer input — a fractional centavo is a bug upstream", () => {
+    expect(() => formatPesoPlain(100.5)).toThrow();
+  });
+
+  it("matches formatPeso apart from the symbol", () => {
+    expect(formatPesoPlain(249108010)).toBe(formatPeso(249108010).replace("₱", ""));
+    expect(formatPesoPlain(-50025)).toBe(formatPeso(-50025).replace("₱", ""));
   });
 });
 
