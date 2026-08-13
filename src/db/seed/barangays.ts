@@ -120,14 +120,13 @@ export const KNOWN_FICTIONAL_BARANGAY_NAMES = [
  * Accepts an optional additional list for barangays outside Pagadian City
  * or any future correction, without needing to edit this file.
  */
-export function seedBarangays(db: EngineDb, extra: readonly SeedBarangay[] = []) {
-  const existingCodes = new Set(
-    db.select({ code: barangay.code }).from(barangay).all().map((r) => r.code),
-  );
+export async function seedBarangays(db: EngineDb, extra: readonly SeedBarangay[] = []) {
+  const existing = await db.query.select({ code: barangay.code }).from(barangay).all();
+  const existingCodes = new Set(existing.map((r) => r.code));
   const toInsert = [...SEED_BARANGAYS, ...extra].filter((b) => !existingCodes.has(b.code));
   if (toInsert.length === 0) return [];
 
-  return db
+  return db.query
     .insert(barangay)
     .values(toInsert.map((b) => ({ code: b.code, name: b.name, isNameConfirmed: b.isNameConfirmed ?? false })))
     .returning()

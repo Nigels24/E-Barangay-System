@@ -17,15 +17,15 @@ import type { EngineDb } from "./types";
  * a manually-typed number from the paper document (D15) — the next
  * auto-generated number must jump past that, not collide with it.
  */
-export function nextJevNo(
+export async function nextJevNo(
   db: EngineDb,
   barangayId: number,
   book: JournalBook,
   year: number,
   month: number,
-): string {
+): Promise<string> {
   const prefix = `${year}-${String(month).padStart(2, "0")}-`;
-  const rows = db
+  const rows = await db.query
     .select({ jevNo: journalEntry.jevNo })
     .from(journalEntry)
     .where(

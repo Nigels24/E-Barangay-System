@@ -36,10 +36,15 @@ export function lastDayOfMonth(year: number, month: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function buildTrialBalance(db: EngineDb, barangayId: number, year: number, month: number): TrialBalanceResult {
+export async function buildTrialBalance(
+  db: EngineDb,
+  barangayId: number,
+  year: number,
+  month: number,
+): Promise<TrialBalanceResult> {
   const asOfDate = lastDayOfMonth(year, month);
 
-  const lines = db
+  const lines = await db.query
     .select({
       accountId: journalEntryLine.accountId,
       debitCentavos: journalEntryLine.debitCentavos,

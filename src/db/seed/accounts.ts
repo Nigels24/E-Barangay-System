@@ -116,14 +116,13 @@ export const CHART_OF_ACCOUNTS_SEED: readonly SeedAccount[] = [
  * running this against a database that already has some or all of these
  * rows is always safe — it never duplicates and never errors.
  */
-export function seedAccounts(db: EngineDb) {
-  const existingCodes = new Set(
-    db.select({ code: account.code }).from(account).all().map((r) => r.code),
-  );
+export async function seedAccounts(db: EngineDb) {
+  const existing = await db.query.select({ code: account.code }).from(account).all();
+  const existingCodes = new Set(existing.map((r) => r.code));
   const toInsert = CHART_OF_ACCOUNTS_SEED.filter((a) => !existingCodes.has(a.code));
   if (toInsert.length === 0) return [];
 
-  return db
+  return db.query
     .insert(account)
     .values(
       toInsert.map((a) => ({

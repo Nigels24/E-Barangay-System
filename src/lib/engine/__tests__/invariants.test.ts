@@ -42,18 +42,22 @@ function splitInto(total: number, n: number, rand: () => number): number[] {
 }
 
 describe("global invariant: many posted vouchers still balance in aggregate", () => {
-  it("total debits equal total credits across 50 randomly generated vouchers", () => {
-    const { db, barangay, user, periods } = seedEngineFixture();
+  it("total debits equal total credits across 50 randomly generated vouchers", async () => {
+    const { db, barangay, user, periods } = await seedEngineFixture();
     const rand = mulberry32(20240115);
 
     // A handful of accounts covering every normal balance, touched repeatedly.
-    const accountIds = [
-      db.insert(account).values({ code: "A1", name: "Asset One", accountType: "asset", normalBalance: "debit" }).returning().get().id,
-      db.insert(account).values({ code: "A2", name: "Asset Two", accountType: "asset", normalBalance: "debit" }).returning().get().id,
-      db.insert(account).values({ code: "L1", name: "Liability One", accountType: "liability", normalBalance: "credit" }).returning().get().id,
-      db.insert(account).values({ code: "I1", name: "Income One", accountType: "income", normalBalance: "credit" }).returning().get().id,
-      db.insert(account).values({ code: "E1", name: "Expense One", accountType: "expense", normalBalance: "debit" }).returning().get().id,
-    ];
+    const accountIds: number[] = [];
+    for (const a of [
+      { code: "A1", name: "Asset One", accountType: "asset" as const, normalBalance: "debit" as const },
+      { code: "A2", name: "Asset Two", accountType: "asset" as const, normalBalance: "debit" as const },
+      { code: "L1", name: "Liability One", accountType: "liability" as const, normalBalance: "credit" as const },
+      { code: "I1", name: "Income One", accountType: "income" as const, normalBalance: "credit" as const },
+      { code: "E1", name: "Expense One", accountType: "expense" as const, normalBalance: "debit" as const },
+    ]) {
+      const row = await db.query.insert(account).values(a).returning().get();
+      accountIds.push(row.id);
+    }
 
     for (let i = 0; i < 50; i++) {
       const debitLineCount = 1 + Math.floor(rand() * 3);
@@ -63,7 +67,7 @@ describe("global invariant: many posted vouchers still balance in aggregate", ()
       const creditParts = splitInto(total, creditLineCount, rand);
 
       const pick = () => accountIds[Math.floor(rand() * accountIds.length)];
-      const draft = createDraftEntry(db, {
+      const draft = await createDraftEntry(db, {
         barangayId: barangay.id,
         periodId: periods.jan2024.id,
         entryDate: "2024-01-15",
@@ -75,10 +79,10 @@ describe("global invariant: many posted vouchers still balance in aggregate", ()
           ...creditParts.map((amountCentavos) => ({ accountId: pick(), side: "credit" as const, amountCentavos })),
         ],
       });
-      postEntry(db, { entryId: draft.id, postedBy: user.id });
+      await postEntry(db, { entryId: draft.id, postedBy: user.id });
     }
 
-    const allLines = db
+    const allLines = await db.query
       .select({ debitCentavos: journalEntryLine.debitCentavos, creditCentavos: journalEntryLine.creditCentavos })
       .from(journalEntryLine)
       .innerJoin(journalEntry, eq(journalEntryLine.entryId, journalEntry.id))
@@ -95,47 +99,46 @@ describe("global invariant: many posted vouchers still balance in aggregate", ()
     // expected, not a bug. What must still hold is its own internal
     // identity: net debit balances and net credit balances agree with
     // each other.
-    const tb = buildTrialBalance(db, barangay.id, 2024, 1);
+    const tb = await buildTrialBalance(db, barangay.id, 2024, 1);
     expect(tb.totalDebitCentavos).toBe(tb.totalCreditCentavos);
   });
 });
 
 describe("global invariant: General Ledger closing balance always equals its Trial Balance line", () => {
-  it("holds for every account touched by a mix of multi-line vouchers", () => {
-    const { db, barangay, user, accounts, periods } = seedEngineFixture();
+  it("holds for every account touched by a mix of multi-line vouchers", async () => {
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
 
-    const post = (lines: { accountId: number; side: "debit" | "credit"; amountCentavos: number }[]) =>
-      postEntry(db, {
-        entryId: createDraftEntry(db, {
-          barangayId: barangay.id,
-          periodId: periods.jan2024.id,
-          entryDate: "2024-01-20",
-          book: "GJ",
-          particulars: "Mixed activity",
-          createdBy: user.id,
-          lines,
-        }).id,
-        postedBy: user.id,
+    const post = async (lines: { accountId: number; side: "debit" | "credit"; amountCentavos: number }[]) => {
+      const draft = await createDraftEntry(db, {
+        barangayId: barangay.id,
+        periodId: periods.jan2024.id,
+        entryDate: "2024-01-20",
+        book: "GJ",
+        particulars: "Mixed activity",
+        createdBy: user.id,
+        lines,
       });
+      return postEntry(db, { entryId: draft.id, postedBy: user.id });
+    };
 
-    post([
+    await post([
       { accountId: accounts.electricity.id, side: "debit", amountCentavos: 5000 },
       { accountId: accounts.cashInBank.id, side: "credit", amountCentavos: 5000 },
     ]);
-    post([
+    await post([
       { accountId: accounts.cashInBank.id, side: "debit", amountCentavos: 20000 },
       { accountId: accounts.ira.id, side: "credit", amountCentavos: 12000 },
       { accountId: accounts.equity.id, side: "credit", amountCentavos: 8000 },
     ]);
-    post([
+    await post([
       { accountId: accounts.electricity.id, side: "debit", amountCentavos: 1500 },
       { accountId: accounts.cashInBank.id, side: "credit", amountCentavos: 1500 },
     ]);
 
-    const tb = buildTrialBalance(db, barangay.id, 2024, 1);
+    const tb = await buildTrialBalance(db, barangay.id, 2024, 1);
 
     for (const acctId of [accounts.cashInBank.id, accounts.electricity.id, accounts.ira.id, accounts.equity.id]) {
-      const gl = buildGeneralLedger(db, barangay.id, acctId, 2024, 1);
+      const gl = await buildGeneralLedger(db, barangay.id, acctId, 2024, 1);
       const tbRow = tb.rows.find((r) => r.accountId === acctId);
       const tbSigned = tbRow ? tbRow.debitCentavos - tbRow.creditCentavos : 0;
       expect(gl.closingBalanceCentavos).toBe(tbSigned);
@@ -144,9 +147,9 @@ describe("global invariant: General Ledger closing balance always equals its Tri
 });
 
 describe("invariant: a posted entry cannot be deleted through any path", () => {
-  function postSimpleEntry(fixture: ReturnType<typeof seedEngineFixture>) {
+  async function postSimpleEntry(fixture: Awaited<ReturnType<typeof seedEngineFixture>>) {
     const { db, barangay, user, accounts, periods } = fixture;
-    const draft = createDraftEntry(db, {
+    const draft = await createDraftEntry(db, {
       barangayId: barangay.id,
       periodId: periods.jan2024.id,
       entryDate: "2024-01-31",
@@ -161,23 +164,25 @@ describe("invariant: a posted entry cannot be deleted through any path", () => {
     return postEntry(db, { entryId: draft.id, postedBy: user.id });
   }
 
-  it("refuses a direct SQL delete of a posted entry, bypassing the engine entirely", () => {
-    const fixture = seedEngineFixture();
-    const posted = postSimpleEntry(fixture);
-    expect(() => fixture.db.delete(journalEntry).where(eq(journalEntry.id, posted.id)).run()).toThrow();
+  it("refuses a direct SQL delete of a posted entry, bypassing the engine entirely", async () => {
+    const fixture = await seedEngineFixture();
+    const posted = await postSimpleEntry(fixture);
+    await expect(
+      fixture.db.query.delete(journalEntry).where(eq(journalEntry.id, posted.id)).run(),
+    ).rejects.toThrow();
   });
 
-  it("refuses a direct SQL delete of a posted entry's lines", () => {
-    const fixture = seedEngineFixture();
-    const posted = postSimpleEntry(fixture);
-    expect(() =>
-      fixture.db.delete(journalEntryLine).where(eq(journalEntryLine.entryId, posted.id)).run(),
-    ).toThrow();
+  it("refuses a direct SQL delete of a posted entry's lines", async () => {
+    const fixture = await seedEngineFixture();
+    const posted = await postSimpleEntry(fixture);
+    await expect(
+      fixture.db.query.delete(journalEntryLine).where(eq(journalEntryLine.entryId, posted.id)).run(),
+    ).rejects.toThrow();
   });
 
-  it("still allows deleting a draft that was never posted — there is no ledger effect to protect yet", () => {
-    const { db, barangay, user, accounts, periods } = seedEngineFixture();
-    const draft = createDraftEntry(db, {
+  it("still allows deleting a draft that was never posted — there is no ledger effect to protect yet", async () => {
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
+    const draft = await createDraftEntry(db, {
       barangayId: barangay.id,
       periodId: periods.jan2024.id,
       entryDate: "2024-01-31",
@@ -189,17 +194,20 @@ describe("invariant: a posted entry cannot be deleted through any path", () => {
         { accountId: accounts.cashInBank.id, side: "credit", amountCentavos: 1000 },
       ],
     });
-    expect(() => db.delete(journalEntryLine).where(eq(journalEntryLine.entryId, draft.id)).run()).not.toThrow();
-    expect(() => db.delete(journalEntry).where(eq(journalEntry.id, draft.id)).run()).not.toThrow();
+    // Both deletes must succeed: an append-only trigger that fired on a draft
+    // would reject these and fail the test.
+    await db.query.delete(journalEntryLine).where(eq(journalEntryLine.entryId, draft.id)).run();
+    await db.query.delete(journalEntry).where(eq(journalEntry.id, draft.id)).run();
+    expect(await db.query.select().from(journalEntry).where(eq(journalEntry.id, draft.id)).get()).toBeUndefined();
   });
 
-  it("the audit trail itself can never be deleted from or modified, not even by an admin", () => {
-    const fixture = seedEngineFixture();
-    postSimpleEntry(fixture);
-    const log = fixture.db.select().from(auditLog).limit(1).get()!;
-    expect(() => fixture.db.delete(auditLog).where(eq(auditLog.id, log.id)).run()).toThrow();
-    expect(() =>
-      fixture.db.update(auditLog).set({ action: "tampered" }).where(eq(auditLog.id, log.id)).run(),
-    ).toThrow();
+  it("the audit trail itself can never be deleted from or modified, not even by an admin", async () => {
+    const fixture = await seedEngineFixture();
+    await postSimpleEntry(fixture);
+    const log = (await fixture.db.query.select().from(auditLog).limit(1).get())!;
+    await expect(fixture.db.query.delete(auditLog).where(eq(auditLog.id, log.id)).run()).rejects.toThrow();
+    await expect(
+      fixture.db.query.update(auditLog).set({ action: "tampered" }).where(eq(auditLog.id, log.id)).run(),
+    ).rejects.toThrow();
   });
 });

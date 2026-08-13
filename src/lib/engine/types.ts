@@ -1,9 +1,11 @@
 /**
- * The database handle type the engine functions operate on.
+ * The database handle the engine operates on.
  *
- * Today this is the better-sqlite3 driver used by the test suite. When the
- * Tauri SQL plugin driver (sqlite-proxy, async) is wired up for the real
- * app, these engine functions will need an async-compatible handle — that
- * is a driver-layer concern for later, not something to design around now.
+ * Per decision D30 this is no longer a driver but a two-capability seam:
+ * `query` for reads and typed SQL building, `writeBatch` for all-or-nothing
+ * writes. The test suite and the desktop app each supply their own
+ * implementation — see `src/db/adapter.ts` for the contract and why writes
+ * cannot go through Drizzle's own `transaction()`.
  */
-export type { TestDb as EngineDb } from "../../db/testDb";
+export type { EngineDb, BatchStatement, BatchStatementResult } from "../../db/adapter";
+export { statement, WriteBatchError } from "../../db/adapter";

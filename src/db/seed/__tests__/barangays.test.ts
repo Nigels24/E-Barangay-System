@@ -4,18 +4,18 @@ import { seedBarangays, SEED_BARANGAYS, KNOWN_FICTIONAL_BARANGAY_NAMES } from ".
 import { barangay } from "../../schema";
 
 describe("seedBarangays", () => {
-  it("seeds all 54 real Pagadian City barangays, sourced from PSGC", () => {
+  it("seeds all 54 real Pagadian City barangays, sourced from PSGC", async () => {
     const db = createTestDb();
-    seedBarangays(db);
-    const rows = db.select().from(barangay).all();
+    await seedBarangays(db);
+    const rows = await db.query.select().from(barangay).all();
     expect(rows).toHaveLength(54);
     expect(rows).toHaveLength(SEED_BARANGAYS.length);
   });
 
-  it("marks only Barangay Upper Sibatang as name-confirmed — it alone is verified against real workbooks", () => {
+  it("marks only Barangay Upper Sibatang as name-confirmed — it alone is verified against real workbooks", async () => {
     const db = createTestDb();
-    seedBarangays(db);
-    const rows = db.select().from(barangay).all();
+    await seedBarangays(db);
+    const rows = await db.query.select().from(barangay).all();
 
     const confirmed = rows.filter((r) => r.isNameConfirmed);
     expect(confirmed).toHaveLength(1);
@@ -23,54 +23,56 @@ describe("seedBarangays", () => {
     expect(confirmed[0].code).toBe("0907322050");
   });
 
-  it("does NOT seed the prototype's three genuinely fictional barangay names", () => {
+  it("does NOT seed the prototype's three genuinely fictional barangay names", async () => {
     const db = createTestDb();
-    seedBarangays(db);
-    const names = db.select().from(barangay).all().map((b) => b.name);
+    await seedBarangays(db);
+    const rows = await db.query.select().from(barangay).all();
+    const names = rows.map((b) => b.name);
     for (const fictional of KNOWN_FICTIONAL_BARANGAY_NAMES) {
       expect(names).not.toContain(fictional);
     }
   });
 
-  it("DOES seed Barangay Santo Niño — real per PSGC, coincidentally also in the old prototype's list", () => {
+  it("DOES seed Barangay Santo Niño — real per PSGC, coincidentally also in the old prototype's list", async () => {
     const db = createTestDb();
-    seedBarangays(db);
-    const names = db.select().from(barangay).all().map((b) => b.name);
+    await seedBarangays(db);
+    const rows = await db.query.select().from(barangay).all();
+    const names = rows.map((b) => b.name);
     expect(names).toContain("Barangay Santo Niño");
   });
 
-  it("no name has the mojibake the source API returned for Santo Niño (\"NiÃ±o\") or any stray whitespace", () => {
+  it("no name has the mojibake the source API returned for Santo Niño (\"NiÃ±o\") or any stray whitespace", async () => {
     for (const b of SEED_BARANGAYS) {
       expect(b.name).not.toMatch(/Ã/);
       expect(b.name).toBe(b.name.trim());
     }
   });
 
-  it("no two seed barangays share the same PSGC code", () => {
+  it("no two seed barangays share the same PSGC code", async () => {
     const codes = SEED_BARANGAYS.map((b) => b.code);
     expect(new Set(codes).size).toBe(codes.length);
   });
 
-  it("is idempotent — running it twice never duplicates", () => {
+  it("is idempotent — running it twice never duplicates", async () => {
     const db = createTestDb();
-    seedBarangays(db);
-    seedBarangays(db);
-    expect(db.select().from(barangay).all()).toHaveLength(SEED_BARANGAYS.length);
+    await seedBarangays(db);
+    await seedBarangays(db);
+    expect(await db.query.select().from(barangay).all()).toHaveLength(SEED_BARANGAYS.length);
   });
 
-  it("accepts an additional list for a barangay outside this seed set, without touching the file", () => {
+  it("accepts an additional list for a barangay outside this seed set, without touching the file", async () => {
     const db = createTestDb();
-    seedBarangays(db, [{ code: "TEST-EXTRA", name: "Barangay Test Extra" }]);
-    const rows = db.select().from(barangay).all();
+    await seedBarangays(db, [{ code: "TEST-EXTRA", name: "Barangay Test Extra" }]);
+    const rows = await db.query.select().from(barangay).all();
     expect(rows).toHaveLength(SEED_BARANGAYS.length + 1);
     expect(rows.map((r) => r.code)).toContain("TEST-EXTRA");
   });
 
-  it("still won't duplicate a barangay passed in the additional list on a second run", () => {
+  it("still won't duplicate a barangay passed in the additional list on a second run", async () => {
     const db = createTestDb();
     const extra = [{ code: "TEST-EXTRA", name: "Barangay Test Extra" }];
-    seedBarangays(db, extra);
-    seedBarangays(db, extra);
-    expect(db.select().from(barangay).all()).toHaveLength(SEED_BARANGAYS.length + 1);
+    await seedBarangays(db, extra);
+    await seedBarangays(db, extra);
+    expect(await db.query.select().from(barangay).all()).toHaveLength(SEED_BARANGAYS.length + 1);
   });
 });

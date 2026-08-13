@@ -7,9 +7,12 @@ import { InvalidStatusError, ClosedPeriodError } from "../errors";
 import { journalEntry, journalEntryLine, auditLog, barangay } from "../../../db/schema";
 import { eq } from "drizzle-orm";
 
-function postSimpleEntry(fixture: ReturnType<typeof seedEngineFixture>, amountCentavos = 1000) {
+async function postSimpleEntry(
+  fixture: Awaited<ReturnType<typeof seedEngineFixture>>,
+  amountCentavos = 1000,
+) {
   const { db, barangay, user, accounts, periods } = fixture;
-  const draft = createDraftEntry(db, {
+  const draft = await createDraftEntry(db, {
     barangayId: barangay.id,
     periodId: periods.jan2024.id,
     entryDate: "2024-01-31",
@@ -25,12 +28,12 @@ function postSimpleEntry(fixture: ReturnType<typeof seedEngineFixture>, amountCe
 }
 
 describe("voidEntry", () => {
-  it("marks the original entry voided and posts a balanced reversal", () => {
-    const fixture = seedEngineFixture();
+  it("marks the original entry voided and posts a balanced reversal", async () => {
+    const fixture = await seedEngineFixture();
     const { db, admin, periods } = fixture;
-    const posted = postSimpleEntry(fixture);
+    const posted = await postSimpleEntry(fixture);
 
-    const result = voidEntry(db, {
+    const result = await voidEntry(db, {
       entryId: posted.id,
       reason: "Wrong account used",
       voidedBy: admin.id,
@@ -44,20 +47,20 @@ describe("voidEntry", () => {
     expect(result.reversal.reversesEntryId).toBe(posted.id);
   });
 
-  it("the reversal's lines are the exact original lines with debit and credit swapped", () => {
-    const fixture = seedEngineFixture();
+  it("the reversal's lines are the exact original lines with debit and credit swapped", async () => {
+    const fixture = await seedEngineFixture();
     const { db, admin, periods } = fixture;
-    const posted = postSimpleEntry(fixture, 1593128);
+    const posted = await postSimpleEntry(fixture, 1593128);
 
-    const originalLines = db.select().from(journalEntryLine).where(eq(journalEntryLine.entryId, posted.id)).all();
-    const result = voidEntry(db, {
+    const originalLines = await db.query.select().from(journalEntryLine).where(eq(journalEntryLine.entryId, posted.id)).all();
+    const result = await voidEntry(db, {
       entryId: posted.id,
       reason: "Duplicate entry",
       voidedBy: admin.id,
       reversalDate: "2024-01-31",
       reversalPeriodId: periods.jan2024.id,
     });
-    const reversalLines = db
+    const reversalLines = await db.query
       .select()
       .from(journalEntryLine)
       .where(eq(journalEntryLine.entryId, result.reversal.id))
@@ -71,10 +74,10 @@ describe("voidEntry", () => {
     }
   });
 
-  it("the reversal always books to the General Journal, even reversing a Check Disbursement", () => {
-    const fixture = seedEngineFixture();
+  it("the reversal always books to the General Journal, even reversing a Check Disbursement", async () => {
+    const fixture = await seedEngineFixture();
     const { db, barangay, user, admin, accounts, periods } = fixture;
-    const draft = createDraftEntry(db, {
+    const draft = await createDraftEntry(db, {
       barangayId: barangay.id,
       periodId: periods.feb2024.id,
       entryDate: "2024-02-01",
@@ -88,9 +91,9 @@ describe("voidEntry", () => {
         { accountId: accounts.cashInBank.id, side: "credit", amountCentavos: 96305 },
       ],
     });
-    const posted = postEntry(db, { entryId: draft.id, postedBy: user.id });
+    const posted = await postEntry(db, { entryId: draft.id, postedBy: user.id });
 
-    const result = voidEntry(db, {
+    const result = await voidEntry(db, {
       entryId: posted.id,
       reason: "Check was voided by the bank",
       voidedBy: admin.id,
@@ -100,11 +103,11 @@ describe("voidEntry", () => {
     expect(result.reversal.book).toBe("GJ");
   });
 
-  it("net ledger effect of a voided entry is zero", () => {
-    const fixture = seedEngineFixture();
+  it("net ledger effect of a voided entry is zero", async () => {
+    const fixture = await seedEngineFixture();
     const { db, admin, periods, accounts } = fixture;
-    const posted = postSimpleEntry(fixture, 50000);
-    const result = voidEntry(db, {
+    const posted = await postSimpleEntry(fixture, 50000);
+    const result = await voidEntry(db, {
       entryId: posted.id,
       reason: "Correction",
       voidedBy: admin.id,
@@ -112,7 +115,7 @@ describe("voidEntry", () => {
       reversalPeriodId: periods.jan2024.id,
     });
 
-    const allLines = db
+    const allLines = await db.query
       .select()
       .from(journalEntryLine)
       .where(eq(journalEntryLine.accountId, accounts.cashInBank.id))
@@ -122,19 +125,19 @@ describe("voidEntry", () => {
     expect(net).toBe(0);
   });
 
-  it("requires a reason", () => {
-    const fixture = seedEngineFixture();
+  it("requires a reason", async () => {
+    const fixture = await seedEngineFixture();
     const { db, admin, periods } = fixture;
-    const posted = postSimpleEntry(fixture);
-    expect(() =>
+    const posted = await postSimpleEntry(fixture);
+    await expect(
       voidEntry(db, { entryId: posted.id, reason: "", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id }),
-    ).toThrow(InvalidStatusError);
+    ).rejects.toThrow(InvalidStatusError);
   });
 
-  it("refuses to void a draft entry", () => {
-    const fixture = seedEngineFixture();
+  it("refuses to void a draft entry", async () => {
+    const fixture = await seedEngineFixture();
     const { db, barangay, user, admin, accounts, periods } = fixture;
-    const draft = createDraftEntry(db, {
+    const draft = await createDraftEntry(db, {
       barangayId: barangay.id,
       periodId: periods.jan2024.id,
       entryDate: "2024-01-31",
@@ -146,62 +149,62 @@ describe("voidEntry", () => {
         { accountId: accounts.cashInBank.id, side: "credit", amountCentavos: 1000 },
       ],
     });
-    expect(() =>
+    await expect(
       voidEntry(db, { entryId: draft.id, reason: "x", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id }),
-    ).toThrow(InvalidStatusError);
+    ).rejects.toThrow(InvalidStatusError);
   });
 
-  it("refuses to void the same entry twice", () => {
-    const fixture = seedEngineFixture();
+  it("refuses to void the same entry twice", async () => {
+    const fixture = await seedEngineFixture();
     const { db, admin, periods } = fixture;
-    const posted = postSimpleEntry(fixture);
-    voidEntry(db, { entryId: posted.id, reason: "First void", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id });
-    expect(() =>
+    const posted = await postSimpleEntry(fixture);
+    await voidEntry(db, { entryId: posted.id, reason: "First void", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id });
+    await expect(
       voidEntry(db, { entryId: posted.id, reason: "Second void", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id }),
-    ).toThrow(InvalidStatusError);
+    ).rejects.toThrow(InvalidStatusError);
   });
 
-  it("refuses to post a reversal into a closed period", () => {
-    const fixture = seedEngineFixture();
+  it("refuses to post a reversal into a closed period", async () => {
+    const fixture = await seedEngineFixture();
     const { db, admin, periods } = fixture;
-    const posted = postSimpleEntry(fixture);
-    closePeriod(db, periods.jan2024.id, admin.id);
-    expect(() =>
+    const posted = await postSimpleEntry(fixture);
+    await closePeriod(db, periods.jan2024.id, admin.id);
+    await expect(
       voidEntry(db, { entryId: posted.id, reason: "x", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id }),
-    ).toThrow(ClosedPeriodError);
+    ).rejects.toThrow(ClosedPeriodError);
   });
 
-  it("refuses a reversal period belonging to a different barangay", () => {
-    const fixture = seedEngineFixture();
+  it("refuses a reversal period belonging to a different barangay", async () => {
+    const fixture = await seedEngineFixture();
     const { db, admin } = fixture;
-    const posted = postSimpleEntry(fixture);
-    const otherBarangay = db
+    const posted = await postSimpleEntry(fixture);
+    const otherBarangay = await db.query
       .insert(barangay)
       .values({ code: "TEST-OTHER", name: "Barangay Test Other" })
       .returning()
       .get();
-    const otherPeriod = ensurePeriod(db, otherBarangay.id, 2024, 1);
-    expect(() =>
+    const otherPeriod = await ensurePeriod(db, otherBarangay.id, 2024, 1);
+    await expect(
       voidEntry(db, { entryId: posted.id, reason: "x", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: otherPeriod.id }),
-    ).toThrow(InvalidStatusError);
+    ).rejects.toThrow(InvalidStatusError);
   });
 
-  it("leaves the original posted entry's own row untouched except for its void fields", () => {
-    const fixture = seedEngineFixture();
+  it("leaves the original posted entry's own row untouched except for its void fields", async () => {
+    const fixture = await seedEngineFixture();
     const { db, admin, periods } = fixture;
-    const posted = postSimpleEntry(fixture);
-    voidEntry(db, { entryId: posted.id, reason: "x", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id });
-    const row = db.select().from(journalEntry).where(eq(journalEntry.id, posted.id)).get();
+    const posted = await postSimpleEntry(fixture);
+    await voidEntry(db, { entryId: posted.id, reason: "x", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id });
+    const row = await db.query.select().from(journalEntry).where(eq(journalEntry.id, posted.id)).get();
     expect(row?.jevNo).toBe(posted.jevNo);
     expect(row?.particulars).toBe(posted.particulars);
   });
 
-  it("writes both a void and a post audit entry", () => {
-    const fixture = seedEngineFixture();
+  it("writes both a void and a post audit entry", async () => {
+    const fixture = await seedEngineFixture();
     const { db, admin, periods } = fixture;
-    const posted = postSimpleEntry(fixture);
-    voidEntry(db, { entryId: posted.id, reason: "x", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id });
-    const logs = db.select().from(auditLog).where(eq(auditLog.userId, admin.id)).all();
+    const posted = await postSimpleEntry(fixture);
+    await voidEntry(db, { entryId: posted.id, reason: "x", voidedBy: admin.id, reversalDate: "2024-01-31", reversalPeriodId: periods.jan2024.id });
+    const logs = await db.query.select().from(auditLog).where(eq(auditLog.userId, admin.id)).all();
     expect(logs.map((l) => l.action)).toEqual(expect.arrayContaining(["journal_entry.void", "journal_entry.post"]));
   });
 });

@@ -12,13 +12,14 @@
  */
 import { eq, and } from "drizzle-orm";
 import { accountingPeriod } from "../../db/schema";
-import type { EngineDb } from "./types";
+import { statement, type EngineDb } from "./types";
 import { InvalidStatusError } from "./errors";
-import { writeAudit } from "./audit";
+import { auditStatement } from "./audit";
+import { nextRowId } from "./ids";
 
 /** Returns the period for (barangay, year, month), opening it if it doesn't exist yet. */
-export function ensurePeriod(db: EngineDb, barangayId: number, year: number, month: number) {
-  const existing = db
+export async function ensurePeriod(db: EngineDb, barangayId: number, year: number, month: number) {
+  const existing = await db.query
     .select()
     .from(accountingPeriod)
     .where(
@@ -31,47 +32,60 @@ export function ensurePeriod(db: EngineDb, barangayId: number, year: number, mon
     .get();
   if (existing) return existing;
 
-  return db
-    .insert(accountingPeriod)
-    .values({ barangayId, year, month })
-    .returning()
-    .get();
+  const id = await nextRowId(db, "accounting_period");
+  // A lone INSERT is atomic on its own — SQLite wraps it in an implicit
+  // transaction — so this needs no batch. It still goes through writeBatch for
+  // one reason: every write in the engine then takes the same path.
+  await db.writeBatch([statement(db.query.insert(accountingPeriod).values({ id, barangayId, year, month }))]);
+
+  return readPeriod(db, id);
 }
 
-export function closePeriod(db: EngineDb, periodId: number, closedBy: number) {
-  const period = db.select().from(accountingPeriod).where(eq(accountingPeriod.id, periodId)).get();
+async function readPeriod(db: EngineDb, periodId: number) {
+  const period = await db.query.select().from(accountingPeriod).where(eq(accountingPeriod.id, periodId)).get();
+  if (!period) throw new InvalidStatusError(`Period ${periodId} does not exist`);
+  return period;
+}
+
+export async function closePeriod(db: EngineDb, periodId: number, closedBy: number) {
+  const period = await db.query.select().from(accountingPeriod).where(eq(accountingPeriod.id, periodId)).get();
   if (!period) throw new InvalidStatusError(`Period ${periodId} does not exist`);
   if (period.status === "closed") {
     throw new InvalidStatusError(`Period ${period.year}-${period.month} is already closed`);
   }
 
-  const updated = db
-    .update(accountingPeriod)
-    .set({ status: "closed", closedAt: new Date().toISOString(), closedBy })
-    .where(eq(accountingPeriod.id, periodId))
-    .returning()
-    .get();
+  const closed = { status: "closed" as const, closedAt: new Date().toISOString(), closedBy };
 
-  writeAudit(db, closedBy, "period.close", "accounting_period", periodId, period, updated);
-  return updated;
+  await db.writeBatch([
+    statement(db.query.update(accountingPeriod).set(closed).where(eq(accountingPeriod.id, periodId))),
+    auditStatement(db, closedBy, "period.close", "accounting_period", periodId, period, {
+      ...period,
+      ...closed,
+    }),
+  ]);
+
+  return readPeriod(db, periodId);
 }
 
-export function reopenPeriod(db: EngineDb, periodId: number, reopenedBy: number, reason: string) {
+export async function reopenPeriod(db: EngineDb, periodId: number, reopenedBy: number, reason: string) {
   if (!reason.trim()) throw new InvalidStatusError("A reason is required to reopen a closed period");
 
-  const period = db.select().from(accountingPeriod).where(eq(accountingPeriod.id, periodId)).get();
+  const period = await db.query.select().from(accountingPeriod).where(eq(accountingPeriod.id, periodId)).get();
   if (!period) throw new InvalidStatusError(`Period ${periodId} does not exist`);
   if (period.status !== "closed") {
     throw new InvalidStatusError(`Period ${period.year}-${period.month} is not closed`);
   }
 
-  const updated = db
-    .update(accountingPeriod)
-    .set({ status: "open", closedAt: null, closedBy: null })
-    .where(eq(accountingPeriod.id, periodId))
-    .returning()
-    .get();
+  const reopened = { status: "open" as const, closedAt: null, closedBy: null };
 
-  writeAudit(db, reopenedBy, "period.reopen", "accounting_period", periodId, period, { ...updated, reason });
-  return updated;
+  await db.writeBatch([
+    statement(db.query.update(accountingPeriod).set(reopened).where(eq(accountingPeriod.id, periodId))),
+    auditStatement(db, reopenedBy, "period.reopen", "accounting_period", periodId, period, {
+      ...period,
+      ...reopened,
+      reason,
+    }),
+  ]);
+
+  return readPeriod(db, periodId);
 }

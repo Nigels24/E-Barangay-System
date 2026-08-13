@@ -26,16 +26,16 @@ export interface GeneralLedgerResult {
   closingBalanceCentavos: number;
 }
 
-export function buildGeneralLedger(
+export async function buildGeneralLedger(
   db: EngineDb,
   barangayId: number,
   accountId: number,
   year: number,
   month: number,
-): GeneralLedgerResult {
+): Promise<GeneralLedgerResult> {
   const asOfDate = lastDayOfMonth(year, month);
 
-  const lines = db
+  const lines = await db.query
     .select({
       entryId: journalEntry.id,
       entryDate: journalEntry.entryDate,

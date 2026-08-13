@@ -261,6 +261,51 @@ app on one office PC (D-deployment), so there are no concurrent writers, and the
 schema's `UNIQUE` and `CHECK` constraints plus the append-only triggers backstop
 every invariant at the database level regardless.
 
+**D31 — The schema is applied by the SQL plugin's own migration runner, and the app
+bootstraps migrate → guard → seed.**
+
+D30 gave the engine a way to *reach* SQLite, but nothing applied the four files in
+`drizzle/` to the real database. The failure this creates is subtler than "no
+database": `Database.load()` **creates an empty file** when none exists, so the
+broken state is a database with no tables, surfacing as `no such table` on the first
+query — on the office PC, in front of the client.
+
+Resolution: register the four migrations via
+`tauri_plugin_sql::Builder::add_migrations`, embedded with `include_str!` because
+there is no `drizzle/` directory beside the installed binary. Startup then runs
+**migrate → guard → seed**:
+
+1. The plugin applies any pending migrations when `Database.load()` is called.
+2. `createAppDb()` asserts the schema is present (all 13 tables *and* the four
+   append-only triggers) and that `foreign_keys` is on, before returning a handle.
+3. `runSeed()` — idempotent — fills reference data on first run.
+
+Guard-before-seed, not the reverse: writing seed data into a database whose schema
+has not been verified is the wrong order. The trigger check matters independently of
+the table check, because the quiet failure is `0000` applying and `0001` not — that
+leaves an app which looks perfectly healthy while nothing at the database level stops
+a posted entry from being deleted.
+
+`preload` was deliberately **not** used. It would migrate at plugin setup and then
+connect a *second* pool when `Database.load()` runs, putting two pools on one file —
+exactly what D30 exists to prevent. `getAppDb()` is memoized per process for the same
+reason.
+
+**Accepted consequences.**
+
+- **Migration files are immutable once applied.** sqlx records a checksum of each
+  migration's SQL in `_sqlx_migrations` inside the transaction that applies it, so
+  editing an already-applied file fails loudly on the next launch instead of
+  diverging silently. Every schema change must therefore be a **new** file — never an
+  edit to an existing one. This is the desired behaviour, not a limitation.
+- **Deleting "the database" means `rm ebarangay.db*`.** sqlx opens SQLite in WAL
+  mode, so the file has `-wal` and `-shm` siblings; removing only the main file
+  leaves state behind.
+- **A bootstrap failure is currently invisible to the user** — it writes to the
+  webview console, which nobody on the office PC will ever open, so a broken database
+  looks like an empty app. Rendering this failure is a required part of the first UI
+  task.
+
 ---
 
 ## Still genuinely blocked on the client

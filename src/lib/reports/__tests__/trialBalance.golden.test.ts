@@ -34,10 +34,10 @@ import { account, appUser, barangay } from "../../../db/schema";
 import { seedAccounts, CHART_OF_ACCOUNTS_SEED } from "../../../db/seed/accounts";
 import { buildTrialBalance } from "../trialBalance";
 
-function seedBarangayAndAdmin() {
+async function seedBarangayAndAdmin() {
   const db = createTestDb();
-  const b = db.insert(barangay).values({ code: "UPS", name: "Barangay Upper Sibatang" }).returning().get();
-  const admin = db
+  const b = await db.query.insert(barangay).values({ code: "UPS", name: "Barangay Upper Sibatang" }).returning().get();
+  const admin = await db.query
     .insert(appUser)
     .values({ username: "admin", passwordHash: "x", fullName: "Peter Paul Cotingjo", role: "admin" })
     .returning()
@@ -116,17 +116,16 @@ describe("Trial Balance golden test — Barangay Upper Sibatang, December 31, 20
     expect(totalCredit).toBe(toCentavos(EXPECTED_TOTAL_PESOS));
   });
 
-  function setUpAndPost() {
-    const fixture = seedBarangayAndAdmin();
+  async function setUpAndPost() {
+    const fixture = await seedBarangayAndAdmin();
     const { db, barangay, admin } = fixture;
 
-    seedAccounts(db);
-    const accountsByCode = new Map(
-      db.select().from(account).all().map((a) => [a.code, a] as const),
-    );
+    await seedAccounts(db);
+    const seededAccounts = await db.query.select().from(account).all();
+    const accountsByCode = new Map(seededAccounts.map((a) => [a.code, a] as const));
 
-    const dec2023 = ensurePeriod(db, barangay.id, 2023, 12);
-    const draft = createDraftEntry(db, {
+    const dec2023 = await ensurePeriod(db, barangay.id, 2023, 12);
+    const draft = await createDraftEntry(db, {
       barangayId: barangay.id,
       periodId: dec2023.id,
       entryDate: "2023-12-31",
@@ -143,19 +142,19 @@ describe("Trial Balance golden test — Barangay Upper Sibatang, December 31, 20
     return { fixture, draft };
   }
 
-  it("posts the client's entire December 2023 trial balance as one balanced voucher", () => {
-    const { fixture, draft } = setUpAndPost();
-    const posted = postEntry(fixture.db, { entryId: draft.id, postedBy: fixture.admin.id });
+  it("posts the client's entire December 2023 trial balance as one balanced voucher", async () => {
+    const { fixture, draft } = await setUpAndPost();
+    const posted = await postEntry(fixture.db, { entryId: draft.id, postedBy: fixture.admin.id });
     expect(posted.status).toBe("posted");
   });
 
   describe("buildTrialBalance reproduces it exactly", () => {
-    let result: ReturnType<typeof buildTrialBalance>;
+    let result: Awaited<ReturnType<typeof buildTrialBalance>>;
 
-    beforeAll(() => {
-      const { fixture, draft } = setUpAndPost();
-      postEntry(fixture.db, { entryId: draft.id, postedBy: fixture.admin.id });
-      result = buildTrialBalance(fixture.db, fixture.barangay.id, 2023, 12);
+    beforeAll(async () => {
+      const { fixture, draft } = await setUpAndPost();
+      await postEntry(fixture.db, { entryId: draft.id, postedBy: fixture.admin.id });
+      result = await buildTrialBalance(fixture.db, fixture.barangay.id, 2023, 12);
     });
 
     it("totals exactly ₱7,790,851.41 on both sides", () => {
@@ -179,10 +178,10 @@ describe("Trial Balance golden test — Barangay Upper Sibatang, December 31, 20
       }
     });
 
-    it("as of an earlier month, the December entry has not happened yet", () => {
-      const { fixture, draft } = setUpAndPost();
-      postEntry(fixture.db, { entryId: draft.id, postedBy: fixture.admin.id });
-      const november = buildTrialBalance(fixture.db, fixture.barangay.id, 2023, 11);
+    it("as of an earlier month, the December entry has not happened yet", async () => {
+      const { fixture, draft } = await setUpAndPost();
+      await postEntry(fixture.db, { entryId: draft.id, postedBy: fixture.admin.id });
+      const november = await buildTrialBalance(fixture.db, fixture.barangay.id, 2023, 11);
       expect(november.rows).toHaveLength(0);
       expect(november.totalDebitCentavos).toBe(0);
     });
