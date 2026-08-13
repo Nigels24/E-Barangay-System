@@ -1,0 +1,30 @@
+/* The bootstrap-failure panel: the whole screen when the database will not open. */
+
+.bootstrap-failure {
+  border-color: var(--danger);
+}
+
+.bootstrap-failure h2 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--danger);
+  margin: 0 0 var(--space-2);
+}
+
+/**
+ * The error's own message. `SchemaMissingError` and the other startup guards
+ * write full sentences meant for the person at the desk, and some of them name
+ * several missing objects — so this wraps and preserves whatever they wrote
+ * rather than clipping it to one tidy line.
+ */
+.bootstrap-failure-message {
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--danger-tint);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

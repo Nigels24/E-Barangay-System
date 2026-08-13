@@ -1,0 +1,100 @@
+/**
+ * The prototype's `.field-row` / `.field` / `.select-wrap` block, ported onto
+ * the tokens.
+ *
+ * `.field-row` lives here rather than in a screen's stylesheet for the same
+ * reason `.badges` lives in Badge.css: it is the layout the control was drawn
+ * inside, not a decision any one screen makes.
+ */
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-end;
+}
+
+.field {
+  flex: 1;
+  min-width: 170px;
+}
+
+/* The action at the end of a field row (e.g. Proceed) sits at its natural
+   width instead of stretching like the inputs do. */
+.field-action {
+  flex: 0;
+}
+
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin-bottom: var(--space-1-5);
+}
+
+.select-wrap {
+  position: relative;
+}
+
+.select-wrap .ic-left {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--primary);
+  /* The icons are decoration sitting on top of the control; without this a
+     click that lands on one would not open the dropdown. */
+  pointer-events: none;
+  display: flex;
+}
+
+.select-wrap .ic-right {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--faint);
+  pointer-events: none;
+  display: flex;
+}
+
+.select-wrap select {
+  width: 100%;
+  /* Removes the platform's own arrow so `.ic-right` is the only one drawn. */
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  /* Right padding clears the chevron; 14px left is the prototype's, off the
+     4px scale but kept exact. */
+  padding: var(--space-3) 36px var(--space-3) 14px;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  outline: none;
+  transition: var(--transition);
+}
+
+.select-wrap select.with-icon {
+  padding-left: 36px;
+}
+
+.select-wrap select:focus {
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+}
+
+.select-wrap select:disabled {
+  background: var(--border-soft);
+  color: var(--disabled-ink);
+  cursor: not-allowed;
+}
+
+/* Set from the component rather than derived with `:has()`, so both icons grey
+   out together on any webview. */
+.select-wrap.is-disabled .ic-left,
+.select-wrap.is-disabled .ic-right {
+  color: var(--disabled-ink);
+}

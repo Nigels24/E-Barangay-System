@@ -32,6 +32,13 @@
   --surface-subtle: #fafbfa;
   --disabled-ink: #b7c2bd;
 
+  /* The prototype's one red, from `.del-btn:hover` — the only destructive /
+     error colour it defines. Named here so an error message and a delete
+     button cannot drift apart into two different reds. Same rule as the rest
+     of the palette: these are the prototype's values, not a new choice. */
+  --danger: #c0392b;
+  --danger-tint: #fbeaea;
+
   /* ---- Typography ----
      NO WEB FONTS. The prototype pulls Sora / Inter / IBM Plex Mono from the
      Google Fonts CDN. This app runs offline on a single City Accounting
@@ -69,6 +76,10 @@
   /* ---- Elevation (both taken from the prototype's shadows) ---- */
   --shadow-sm: 0 1px 2px rgba(15, 42, 35, 0.08);
   --shadow-card: 0 1px 3px rgba(15, 42, 35, 0.05);
+  /* The focus halo on inputs and selects: `--primary` at 10%, verbatim from
+     the prototype's `select:focus`. A whole shadow rather than a colour,
+     because that is the shape every focusable control needs to share. */
+  --focus-ring: 0 0 0 4px rgba(15, 107, 92, 0.1);
 
   /* ---- Layout ---- */
   --content-max: 960px;

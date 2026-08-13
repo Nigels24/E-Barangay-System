@@ -1,0 +1,37 @@
+/* The opened period, shown under the pickers once Proceed has run. */
+
+.period-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.period-summary-head h2 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.period-summary-head p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: var(--space-1) 0 0;
+}
+
+/**
+ * A failure the person at the desk has to read, sitting where the hint would
+ * be. Louder than `.hint` on purpose: this is the difference between "nothing
+ * chosen yet" and "the books did not open".
+ */
+.form-error {
+  font-size: 13px;
+  color: var(--danger);
+  background: var(--danger-tint);
+  border-radius: var(--radius-md);
+  padding: var(--space-2-5) var(--space-3);
+  margin-top: var(--space-2-5);
+  margin-bottom: 0;
+}
