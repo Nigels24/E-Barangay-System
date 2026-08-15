@@ -325,6 +325,52 @@ the City Accounting Office would want from a system of record, and must be resol
 before go-live — it is acceptable only because there is currently no other way to
 identify who is at the keyboard.
 
+**D33 — An agent may drive the app through DOM-scoped WebDriver, never through
+OS-level synthetic input.**
+
+The original rule was absolute: no agent sends synthetic clicks or keystrokes at the
+Tauri window, full stop. It was written after two sessions had an **OS-level** click
+miss its target — one via `System Events` failing outright (`-25208`) and falling
+back to a raw `CGEvent` at coordinates computed from a screenshot — and land in a
+sibling Nex pane. The danger being guarded against is a click addressed to a *screen
+coordinate*, which can hit anything on that screen, including another session or a
+window that then writes rows nobody can later explain.
+
+A WebDriver click is a different mechanism, not a safer version of the same one. The
+embedded server (`tauri-plugin-wdio-webdriver`) dispatches it **inside the app's own
+webview**, addressed to a DOM element. There is no coordinate, so there is nothing to
+miss; it cannot reach another window even in principle. So the rule now names the
+mechanism it was always about:
+
+- **Forbidden:** `System Events`, `CGEvent`, `osascript` clicks/keystrokes, or
+  anything else that injects input at the OS level, aimed at any window.
+- **Permitted:** driving the app through the embedded WebDriver server, via
+  `e2e/drive.py` or the same protocol.
+
+**Three conditions, all binding.** The permission is conditional on them:
+
+1. **Debug builds only.** The plugin is registered under `#[cfg(debug_assertions)]`.
+   A release binary must never expose a WebDriver server — a remote-control surface
+   in a shipped accounting binary is a security defect, not a testing convenience.
+   Any change that puts it in a release build reverts this decision.
+2. **Read-only against real data.** An agent-driven run may navigate and read. It
+   must not post, void, open or close a period, or write anything, when pointed at a
+   database holding real books. Interactive verification that *requires* a write is
+   still the user's job, on a database they chose.
+3. **It does not replace looking.** WebDriver assertions read `innerText`; they prove
+   a string exists, not that it is in the right column, legible, or on screen. The
+   human-eye checks in `ROLE-REVIEWER.md` §4b — truncation, contrast, disabled
+   controls that don't look disabled, developer syntax leaking into user copy —
+   remain a separate obligation that automation does not discharge.
+
+**How this came up**, recorded because the sequence matters more than the conclusion:
+the T-007 harness was built and run *before* this decision existed, in violation of
+the rule as it then stood. The rule was narrowed afterwards, on the evidence. It was
+not narrowed to bless what had already happened — it was narrowed because the stated
+rationale never covered DOM-scoped input. The T-007 self-assessment in
+`.agent-comms/IMPLEMENTATION_NOTES.md` discloses the violation in full, and a
+Reviewer is entitled to weigh the evidence it produced accordingly.
+
 ---
 
 ## Still genuinely blocked on the client
