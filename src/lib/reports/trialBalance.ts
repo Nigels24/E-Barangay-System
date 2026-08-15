@@ -30,6 +30,8 @@ export interface TrialBalanceResult {
   rows: TrialBalanceRow[];
   totalDebitCentavos: number;
   totalCreditCentavos: number;
+  /** True when at least one posted line exists through this date, even if every account nets to zero and `rows` is empty. */
+  hasPostedLines: boolean;
 }
 
 /** Last calendar day of the given month, as an ISO date string. */
@@ -102,5 +104,6 @@ export async function buildTrialBalance(
     rows,
     totalDebitCentavos: sumCentavos(rows.map((r) => r.debitCentavos)),
     totalCreditCentavos: sumCentavos(rows.map((r) => r.creditCentavos)),
+    hasPostedLines: lines.length > 0,
   };
 }

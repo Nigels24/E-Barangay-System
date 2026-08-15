@@ -185,7 +185,11 @@ function TrialBalanceView({ tb, tbError }: { tb: TrialBalanceResult | null; tbEr
     <>
       {tb.rows.length === 0 ? (
         <div className="table-card">
-          <p className="empty-row">No posted activity for this barangay through this period.</p>
+          <p className="empty-row">
+            {tb.hasPostedLines
+              ? "Every account nets to zero through this period. See the General Ledger for the posted activity."
+              : "No posted activity for this barangay through this period."}
+          </p>
         </div>
       ) : (
         <div className="table-card">

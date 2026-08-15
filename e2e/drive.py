@@ -31,17 +31,33 @@ a shipped accounting binary is a security defect, not a testing convenience.
     ./src-tauri/target/debug/ebarangay-books &
     python3 e2e/drive.py
 
-It only ever navigates and reads. Reports are read-only by design, and this
-never posts, never opens a period, and never touches the composer — so it is
-safe to point at the real database, which is the point: the figures it checks
-are the ones actually on disk.
+Reports are read-only by design, and this never posts, never voids, and never
+touches the composer. **One click here is not read-only on its own:**
+`click("Proceed")` on the period picker reaches `openPeriodSummary()` →
+`ensurePeriod()` (`src/lib/engine/period.ts:21-42`), which `INSERT`s a new
+`accounting_period` row when none exists yet for the chosen
+barangay/year/month. That is a write path, and clicking it blind would
+violate D33's "read-only against real books" condition.
+
+What actually keeps this harness read-only is `open_books()` below: before it
+ever clicks Proceed, it queries `accounting_period` directly (via
+`db_select`, the same read command the app itself uses — see
+`src/db/appDb.ts` and `src-tauri/src/db_bridge.rs`) to confirm a row for
+`BARANGAY`/`YEAR`/`MONTH` already exists, and refuses to click and aborts
+loudly if it does not. Today that check always passes, because the fixture
+period was opened once by hand and never deleted — so the click lands on
+`ensurePeriod`'s existing-row branch and reads, it does not insert. If the
+fixture period is ever deleted, this harness stops rather than silently
+creating a new one.
 """
+import calendar
 import json
 import sys
 import time
 import urllib.request
 
 BASE = "http://127.0.0.1:4445"
+DB_URL = "sqlite:ebarangay.db"  # must match src/db/appDb.ts's APP_DB_URL
 
 # The figures below are the ones on disk when this was written: Barangay
 # Balintawak, January 2026, one posted voucher (2026-01-001) — Cash in Bank
@@ -50,6 +66,7 @@ BASE = "http://127.0.0.1:4445"
 BARANGAY = "Barangay Balintawak"
 YEAR = "2026"
 MONTH = "January"
+MONTH_NUMBER = list(calendar.month_name).index(MONTH)
 # An asset holding a CREDIT balance — the abnormal case the Dr/Cr rule exists
 # for. It must read "500.00 Cr", never "-500.00".
 ABNORMAL_ACCOUNT = "1-01-01-010"
@@ -127,12 +144,69 @@ def check(label, condition):
         failures.append(label)
 
 
+def db_select(sql, params):
+    """
+    Runs a read-only query through the app's own `db_select` Tauri command —
+    the same read path `src/db/appDb.ts` uses, reached via
+    `window.__TAURI_INTERNALS__.invoke`, which the webview always injects for
+    `@tauri-apps/api` regardless of the `withGlobalTauri` config. `execute/sync`
+    cannot await a promise, so this fires the call, stashes the settled result
+    on `window`, and polls for it.
+    """
+    js(
+        """
+        const [sql, params] = arguments;
+        window.__driveDbResult = { pending: true };
+        window.__TAURI_INTERNALS__.invoke('db_select', { db: arguments[2], sql, params })
+          .then(r => { window.__driveDbResult = { pending: false, ok: true, value: r }; })
+          .catch(e => { window.__driveDbResult = { pending: false, ok: false, error: String(e) }; });
+        """,
+        sql,
+        params,
+        DB_URL,
+    )
+    for _ in range(50):
+        result = js("return window.__driveDbResult")
+        if result and not result.get("pending"):
+            if not result["ok"]:
+                raise RuntimeError(f"db_select failed: {result['error']}")
+            return result["value"]["rows"]
+        time.sleep(0.1)
+    raise RuntimeError("db_select timed out waiting for a settled result")
+
+
+def period_exists(barangay_name, year, month):
+    rows = db_select(
+        "SELECT ap.id FROM accounting_period ap "
+        "JOIN barangay b ON b.id = ap.barangay_id "
+        "WHERE b.name = ? AND ap.year = ? AND ap.month = ?",
+        [barangay_name, int(year), int(month)],
+    )
+    return len(rows) > 0
+
+
 def open_books():
-    """Picker → period card. Back always lands here with the pickers cleared."""
+    """
+    Picker → period card. Back always lands here with the pickers cleared.
+
+    Clicking Proceed reaches `ensurePeriod()` (`period.ts:21-42`), which
+    INSERTs a new `accounting_period` row when none exists yet — a write
+    path, not a read. This harness is read-only by construction, not by luck:
+    it confirms the target period already exists on disk before ever
+    clicking, and aborts loudly rather than risk creating one.
+    """
     choose(0, BARANGAY)
     choose(1, YEAR)
     choose(2, MONTH)
     time.sleep(0.4)
+    if not period_exists(BARANGAY, YEAR, MONTH_NUMBER):
+        raise RuntimeError(
+            f"refusing to click Proceed: no accounting_period row exists yet for "
+            f"{BARANGAY} {MONTH} {YEAR}. Clicking Proceed would INSERT one via "
+            f"ensurePeriod() (period.ts:21-42) — this harness must never write to "
+            f"the real database (D33). Open this period by hand first if the "
+            f"fixture was deleted."
+        )
     click("Proceed")
     time.sleep(2.5)
 
