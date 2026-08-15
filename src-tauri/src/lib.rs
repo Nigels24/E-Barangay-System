@@ -84,6 +84,10 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
+        // An in-process W3C WebDriver server, so an end-to-end test can drive
+        // the real window (macOS has no external WKWebView driver). Debug
+        // builds only — it must never be reachable in a shipped binary.
+        app.handle().plugin(tauri_plugin_wdio_webdriver::init())?;
       }
       Ok(())
     })
