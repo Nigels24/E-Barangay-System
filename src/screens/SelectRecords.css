@@ -8,6 +8,13 @@
   flex-wrap: wrap;
 }
 
+.period-summary-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
 .period-summary-head h2 {
   font-family: var(--font-display);
   font-size: 15px;

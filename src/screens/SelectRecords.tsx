@@ -27,7 +27,23 @@ import "./SelectRecords.css";
  * obvious. They are converted once, at the call boundary, and
  * `openPeriodSummary` rejects anything that did not survive the trip.
  */
-export function SelectRecords({ db }: { db: EngineDb }) {
+
+/** What `onOpenBooks` hands `App` — everything the journal screen needs, resolved once here. */
+export interface OpenedBooks {
+  barangayId: number;
+  barangayName: string;
+  periodId: number;
+  year: number;
+  month: number;
+}
+
+export function SelectRecords({
+  db,
+  onOpenBooks,
+}: {
+  db: EngineDb;
+  onOpenBooks: (opened: OpenedBooks) => void;
+}) {
   const [barangays, setBarangays] = useState<BarangayOption[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
 
@@ -161,15 +177,33 @@ export function SelectRecords({ db }: { db: EngineDb }) {
         <Card className="period-summary">
           <div className="period-summary-head">
             <div>
-              <h2>
-                {formatPeriodLabel(summary.year, summary.month)}
-                {openedBarangay ? ` · ${openedBarangay}` : ""}
-              </h2>
+              <div className="period-summary-title">
+                <h2>
+                  {formatPeriodLabel(summary.year, summary.month)}
+                  {openedBarangay ? ` · ${openedBarangay}` : ""}
+                </h2>
+                <Badge tone={summary.status === "open" ? "open" : "closed"}>
+                  {summary.status === "open" ? "Open for posting" : "Closed"}
+                </Badge>
+              </div>
               <p>
                 {summary.entryCount} journal {summary.entryCount === 1 ? "entry" : "entries"}
               </p>
             </div>
-            <Badge icon={<CalendarIcon />}>{summary.status === "open" ? "Open" : "Closed"}</Badge>
+            <Button
+              variant="dark"
+              onClick={() =>
+                onOpenBooks({
+                  barangayId: summary.barangayId,
+                  barangayName: openedBarangay,
+                  periodId: summary.periodId,
+                  year: summary.year,
+                  month: summary.month,
+                })
+              }
+            >
+              Open the books →
+            </Button>
           </div>
         </Card>
       ) : null}

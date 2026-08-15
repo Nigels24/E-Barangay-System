@@ -78,3 +78,45 @@ export function monthLabel(month: number): string {
 export function formatPeriodLabel(year: number, month: number): string {
   return `${monthLabel(month)} ${year}`;
 }
+
+/**
+ * The "YYYY-MM-" an ISO date must start with to belong to a period. This is
+ * the exact rule `postEntry` enforces (`post.ts`), restated here so a form can
+ * stop a date before it becomes a refusal.
+ */
+export function periodDatePrefix(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function daysInMonth(year: number, month: number): number {
+  const lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month !== 2) return lengths[month - 1];
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return leap ? 29 : 28;
+}
+
+/**
+ * First day of the period, "2023-12-01" — what a new voucher's date starts on
+ * and the earliest date its picker allows.
+ */
+export function periodStartDate(year: number, month: number): string {
+  monthLabel(month); // rejects a month outside 1-12 with the same message everywhere
+  return `${periodDatePrefix(year, month)}-01`;
+}
+
+/** Last day of the period, "2023-12-31" — the latest date the picker allows. */
+export function periodEndDate(year: number, month: number): string {
+  monthLabel(month);
+  return `${periodDatePrefix(year, month)}-${String(daysInMonth(year, month)).padStart(2, "0")}`;
+}
+
+/**
+ * Whether an ISO date belongs to a period.
+ *
+ * Deliberately a prefix comparison rather than date arithmetic: that is
+ * literally what `postEntry` checks, and a form that used a subtly different
+ * rule would let through a date the engine then refuses.
+ */
+export function isWithinPeriod(isoDate: string, year: number, month: number): boolean {
+  return isoDate.startsWith(`${periodDatePrefix(year, month)}-`);
+}

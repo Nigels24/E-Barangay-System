@@ -83,6 +83,8 @@
 
   /* ---- Layout ---- */
   --content-max: 960px;
+  /* The prototype's `.wrap-wide`, for the journal screen's ledger table. */
+  --content-max-wide: 1180px;
 
   /* ---- Motion ---- */
   --transition: 0.15s;

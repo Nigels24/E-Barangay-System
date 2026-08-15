@@ -306,6 +306,25 @@ reason.
   looks like an empty app. Rendering this failure is a required part of the first UI
   task.
 
+**D32 — Until real users exist (Phase 5, D24), the app writes every action as one
+placeholder user.**
+
+`journal_entry.createdBy` and `audit_log.userId` are both `NOT NULL` references to
+`app_user`, and until the voucher screen nothing outside the test fixtures ever
+inserted a user — a voucher could not be created on the real database at all.
+`runSeed()` now seeds one placeholder row (`src/db/seed/users.ts`), role
+`bookkeeper`, named unmistakably as a stand-in (`placeholder-bookkeeper` /
+"Placeholder Bookkeeper (no login yet)"). Every `createdBy`, `postedBy` and audit
+`userId` the UI writes resolves to this one row, looked up by username
+(`requirePostingUserId()` in `src/lib/queries/users.ts`) rather than assumed to be
+id `1` — a database seeded before this row existed may already hold other ids.
+
+**Accepted consequence.** Until Phase 5 ships real users and login, the audit trail
+attributes every action in this database to one generic actor. That is weaker than
+the City Accounting Office would want from a system of record, and must be resolved
+before go-live — it is acceptable only because there is currently no other way to
+identify who is at the keyboard.
+
 ---
 
 ## Still genuinely blocked on the client

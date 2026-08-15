@@ -2,16 +2,62 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1-5);
-  border: 1px solid var(--border);
-  background: var(--surface);
   border-radius: var(--radius-pill);
   padding: var(--space-1-5) var(--space-3);
   font-size: 12.5px;
   font-weight: 500;
+  /* Nothing here is clickable. Stops a stray click from selecting the text and
+     making the pill look like it responded to being pressed. */
+  user-select: none;
 }
 
-.badge svg {
+/* The prototype's neutral pill: a label, on the page's surface. */
+.badge-outline {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.badge-outline svg {
   color: var(--primary);
+}
+
+/**
+ * The status tones. Borderless and tinted, so they read as a property of the
+ * thing they sit on rather than as something to press — the distinction that
+ * matters most on the period card, where a bordered pill flush right is
+ * exactly the shape of a button.
+ */
+.badge-open,
+.badge-closed,
+.badge-draft,
+.badge-posted,
+.badge-voided {
+  border: 1px solid transparent;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* Teal for both: an open period and a posted voucher are the same kind of
+   "in effect / good" state, just for different things on this screen. */
+.badge-open,
+.badge-posted {
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+
+/* Gold rather than red: a closed period and an unposted draft are both normal
+   states of the books, not faults. */
+.badge-closed,
+.badge-draft {
+  background: var(--gold-tint);
+  color: var(--gold-ink);
+}
+
+/* A voided voucher is still in the books, cancelled by a reversing entry. It
+   is the one status that should stop the eye. */
+.badge-voided {
+  background: var(--danger-tint);
+  color: var(--danger);
 }
 
 /* The prototype groups badges (barangay / year / month) in a wrapping row. */
@@ -19,4 +65,5 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  align-items: center;
 }

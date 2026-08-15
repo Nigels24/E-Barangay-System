@@ -3,13 +3,20 @@ import { AppShell } from "./components/AppShell";
 import { Card } from "./components/Card";
 import { errorMessage } from "./lib/errorMessage";
 import type { EngineDb } from "./lib/engine/types";
-import { SelectRecords } from "./screens/SelectRecords";
+import { JournalVoucher } from "./screens/JournalVoucher";
+import { SelectRecords, type OpenedBooks } from "./screens/SelectRecords";
 import "./App.css";
 
 type Bootstrap =
   | { status: "loading" }
   | { status: "ready"; db: EngineDb }
   | { status: "failed"; message: string };
+
+/**
+ * The one screen transition the app has. No router: there are exactly two
+ * screens, and `App` already owns the bootstrap state beside it.
+ */
+type Screen = { name: "select" } | ({ name: "journal" } & OpenedBooks);
 
 /**
  * The app, and the one place the database bootstrap becomes visible.
@@ -27,6 +34,7 @@ type Bootstrap =
  */
 function App({ db }: { db: Promise<EngineDb> }) {
   const [bootstrap, setBootstrap] = useState<Bootstrap>({ status: "loading" });
+  const [screen, setScreen] = useState<Screen>({ name: "select" });
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +52,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
   }, [db]);
 
   return (
-    <AppShell>
+    <AppShell wide={bootstrap.status === "ready" && screen.name === "journal"}>
       {bootstrap.status === "loading" ? (
         <Card title="Opening the books…" subtitle="Preparing the database on this computer." />
       ) : null}
@@ -60,7 +68,21 @@ function App({ db }: { db: Promise<EngineDb> }) {
         </Card>
       ) : null}
 
-      {bootstrap.status === "ready" ? <SelectRecords db={bootstrap.db} /> : null}
+      {bootstrap.status === "ready" ? (
+        screen.name === "select" ? (
+          <SelectRecords db={bootstrap.db} onOpenBooks={(opened) => setScreen({ name: "journal", ...opened })} />
+        ) : (
+          <JournalVoucher
+            db={bootstrap.db}
+            barangayId={screen.barangayId}
+            barangayName={screen.barangayName}
+            periodId={screen.periodId}
+            year={screen.year}
+            month={screen.month}
+            onBack={() => setScreen({ name: "select" })}
+          />
+        )
+      ) : null}
     </AppShell>
   );
 }

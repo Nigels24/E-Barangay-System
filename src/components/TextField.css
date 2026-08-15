@@ -1,0 +1,56 @@
+/* The prototype's `.text-input`, and the `.amt-wrap` peso prefix, on tokens. */
+
+.input-wrap {
+  position: relative;
+}
+
+.text-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  /* 14px matches `.select-wrap select`, so an input and a select sitting side
+     by side in one row line their text up. */
+  padding: var(--space-3) 14px;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  outline: none;
+  transition: var(--transition);
+}
+
+.text-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+}
+
+.text-input:disabled {
+  background: var(--border-soft);
+  color: var(--disabled-ink);
+  cursor: not-allowed;
+}
+
+/* The prototype's `.amt-wrap`: the ₱ sits inside the field's left edge. */
+.input-wrap .ic-prefix {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.input-wrap.has-prefix .text-input {
+  padding-left: 26px;
+}
+
+/**
+ * A money field reads as money while it is being typed, not only once it is
+ * stored — same tabular digits as the ledger columns it will end up in.
+ */
+.text-input.figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

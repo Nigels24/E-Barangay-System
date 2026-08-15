@@ -19,7 +19,7 @@ const database = isTauri()
   : Promise.reject(
       new Error(
         'This app reaches its database through the desktop shell, which is not running. ' +
-          'Start it with `npm run tauri dev` rather than `npm run dev`.',
+          'Start it with npm run tauri dev rather than npm run dev.',
       ),
     )
 

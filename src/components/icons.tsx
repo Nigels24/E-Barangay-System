@@ -69,3 +69,59 @@ export function ChevronDownIcon({ size = 16 }: { size?: number }) {
     </Glyph>
   );
 }
+
+/** Back to the previous screen. */
+export function ArrowLeftIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <path d="M19 12H5" />
+      <path d="M12 19l-7-7 7-7" />
+    </Glyph>
+  );
+}
+
+/** Add — a voucher line, in this app. */
+export function PlusIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <path d="M12 5v14M5 12h14" />
+    </Glyph>
+  );
+}
+
+/**
+ * Removes a line from a voucher that has not been posted yet.
+ *
+ * The prototype used its trash glyph to delete a row from the ledger, which
+ * this system does not allow — nothing posted is ever deleted. Here it only
+ * ever removes a line from the voucher currently being typed.
+ */
+export function TrashIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    </Glyph>
+  );
+}
+
+/** Money, on the journal's stat cards. */
+export function WalletIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <path d="M20 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2Z" />
+      <path d="M16 7V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3" />
+      <circle cx="16" cy="13" r="1.3" fill="currentColor" stroke="none" />
+    </Glyph>
+  );
+}
+
+/** Confirmation that something landed in the books. */
+export function CheckIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <polyline points="20 6 9 17 4 12" />
+    </Glyph>
+  );
+}

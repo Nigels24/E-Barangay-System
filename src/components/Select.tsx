@@ -10,6 +10,8 @@ export interface SelectOption {
 
 interface SelectProps {
   label: string;
+  /** Keeps the label for a screen reader but not on screen — for a control in a table column that is already headed. */
+  hideLabel?: boolean;
   /** The teal glyph inside the left edge of the control. */
   icon?: ReactNode;
   /** The greyed first option, shown until something is chosen. */
@@ -19,6 +21,7 @@ interface SelectProps {
   options: readonly SelectOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
+  className?: string;
 }
 
 /**
@@ -38,18 +41,22 @@ interface SelectProps {
  */
 export function Select({
   label,
+  hideLabel = false,
   icon,
   placeholder,
   value,
   options,
   onChange,
   disabled = false,
+  className,
 }: SelectProps) {
   const id = useId();
 
   return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
+    <div className={className ? `field ${className}` : "field"}>
+      <label htmlFor={id} className={hideLabel ? "sr-only" : undefined}>
+        {label}
+      </label>
       <div className={disabled ? "select-wrap is-disabled" : "select-wrap"}>
         {icon ? <span className="ic-left">{icon}</span> : null}
         <select

@@ -10,9 +10,11 @@ describe("runSeed", () => {
     const first = await runSeed(db);
     expect(first.barangays).toHaveLength(SEED_BARANGAYS.length);
     expect(first.accounts).toHaveLength(CHART_OF_ACCOUNTS_SEED.length);
+    expect(first.users).toHaveLength(1);
 
     const second = await runSeed(db);
     expect(second.barangays).toHaveLength(0);
     expect(second.accounts).toHaveLength(0);
+    expect(second.users).toHaveLength(0);
   });
 });
