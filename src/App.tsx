@@ -4,6 +4,7 @@ import { Card } from "./components/Card";
 import { errorMessage } from "./lib/errorMessage";
 import type { EngineDb } from "./lib/engine/types";
 import { JournalVoucher } from "./screens/JournalVoucher";
+import { Reports } from "./screens/Reports";
 import { SelectRecords, type OpenedBooks } from "./screens/SelectRecords";
 import "./App.css";
 
@@ -13,10 +14,15 @@ type Bootstrap =
   | { status: "failed"; message: string };
 
 /**
- * The one screen transition the app has. No router: there are exactly two
- * screens, and `App` already owns the bootstrap state beside it.
+ * The app's screen transitions. No router: there are three screens, and
+ * `App` already owns the bootstrap state beside it. Reports carries `from`
+ * so its Back returns to wherever it was opened from — the picker, or a
+ * voucher in progress — rather than always landing on the picker.
  */
-type Screen = { name: "select" } | ({ name: "journal" } & OpenedBooks);
+type Screen =
+  | { name: "select" }
+  | ({ name: "journal" } & OpenedBooks)
+  | ({ name: "reports"; from: "select" | "journal" } & OpenedBooks);
 
 /**
  * The app, and the one place the database bootstrap becomes visible.
@@ -52,7 +58,9 @@ function App({ db }: { db: Promise<EngineDb> }) {
   }, [db]);
 
   return (
-    <AppShell wide={bootstrap.status === "ready" && screen.name === "journal"}>
+    <AppShell
+      wide={bootstrap.status === "ready" && (screen.name === "journal" || screen.name === "reports")}
+    >
       {bootstrap.status === "loading" ? (
         <Card title="Opening the books…" subtitle="Preparing the database on this computer." />
       ) : null}
@@ -70,8 +78,12 @@ function App({ db }: { db: Promise<EngineDb> }) {
 
       {bootstrap.status === "ready" ? (
         screen.name === "select" ? (
-          <SelectRecords db={bootstrap.db} onOpenBooks={(opened) => setScreen({ name: "journal", ...opened })} />
-        ) : (
+          <SelectRecords
+            db={bootstrap.db}
+            onOpenBooks={(opened) => setScreen({ name: "journal", ...opened })}
+            onViewReports={(opened) => setScreen({ name: "reports", from: "select", ...opened })}
+          />
+        ) : screen.name === "journal" ? (
           <JournalVoucher
             db={bootstrap.db}
             barangayId={screen.barangayId}
@@ -80,6 +92,37 @@ function App({ db }: { db: Promise<EngineDb> }) {
             year={screen.year}
             month={screen.month}
             onBack={() => setScreen({ name: "select" })}
+            onViewReports={() =>
+              setScreen({
+                name: "reports",
+                from: "journal",
+                barangayId: screen.barangayId,
+                barangayName: screen.barangayName,
+                periodId: screen.periodId,
+                year: screen.year,
+                month: screen.month,
+              })
+            }
+          />
+        ) : (
+          <Reports
+            db={bootstrap.db}
+            barangayId={screen.barangayId}
+            barangayName={screen.barangayName}
+            year={screen.year}
+            month={screen.month}
+            onBack={() =>
+              screen.from === "journal"
+                ? setScreen({
+                    name: "journal",
+                    barangayId: screen.barangayId,
+                    barangayName: screen.barangayName,
+                    periodId: screen.periodId,
+                    year: screen.year,
+                    month: screen.month,
+                  })
+                : setScreen({ name: "select" })
+            }
           />
         )
       ) : null}

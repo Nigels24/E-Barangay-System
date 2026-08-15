@@ -6,6 +6,7 @@ import { Select, type SelectOption } from "../components/Select";
 import { TextField } from "../components/TextField";
 import {
   ArrowLeftIcon,
+  BarChartIcon,
   BuildingIcon,
   CalendarDaysIcon,
   CalendarIcon,
@@ -66,6 +67,7 @@ interface JournalVoucherProps {
   year: number;
   month: number;
   onBack: () => void;
+  onViewReports: () => void;
 }
 
 /**
@@ -85,6 +87,7 @@ export function JournalVoucher({
   year,
   month,
   onBack,
+  onViewReports,
 }: JournalVoucherProps) {
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
   const [accountsError, setAccountsError] = useState<string | null>(null);
@@ -252,6 +255,9 @@ export function JournalVoucher({
           <Badge icon={<BuildingIcon />}>{barangayName}</Badge>
           <Badge icon={<CalendarIcon />}>{year}</Badge>
           <Badge icon={<CalendarDaysIcon />}>{monthLabel(month)}</Badge>
+          <Button variant="ghost" size="sm" onClick={onViewReports}>
+            <BarChartIcon size={14} /> View reports
+          </Button>
         </div>
       </div>
 

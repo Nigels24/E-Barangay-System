@@ -19,6 +19,8 @@ export interface TrialBalanceRow {
   accountId: number;
   code: string;
   name: string;
+  /** True when `code` is a placeholder awaiting the City Accountant (D12) — the screen must mark it, not print it as confirmed. */
+  isProvisionalCode: boolean;
   debitCentavos: number;
   creditCentavos: number;
 }
@@ -51,6 +53,7 @@ export async function buildTrialBalance(
       creditCentavos: journalEntryLine.creditCentavos,
       code: account.code,
       name: account.name,
+      isProvisionalCode: account.isProvisionalCode,
     })
     .from(journalEntryLine)
     .innerJoin(journalEntry, eq(journalEntryLine.entryId, journalEntry.id))
@@ -68,7 +71,14 @@ export async function buildTrialBalance(
   for (const line of lines) {
     const existing =
       byAccount.get(line.accountId) ??
-      ({ accountId: line.accountId, code: line.code, name: line.name, debitCentavos: 0, creditCentavos: 0 } satisfies TrialBalanceRow);
+      ({
+        accountId: line.accountId,
+        code: line.code,
+        name: line.name,
+        isProvisionalCode: line.isProvisionalCode,
+        debitCentavos: 0,
+        creditCentavos: 0,
+      } satisfies TrialBalanceRow);
     existing.debitCentavos += line.debitCentavos;
     existing.creditCentavos += line.creditCentavos;
     byAccount.set(line.accountId, existing);

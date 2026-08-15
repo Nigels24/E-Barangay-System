@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   EARLIEST_SELECTABLE_YEAR,
   MONTHS,
+  formatIsoDateLong,
   formatPeriodLabel,
   isWithinPeriod,
   monthLabel,
@@ -108,5 +109,15 @@ describe("isWithinPeriod", () => {
   it("rejects an empty or malformed date rather than passing it through", () => {
     expect(isWithinPeriod("", 2023, 12)).toBe(false);
     expect(isWithinPeriod("not a date", 2023, 12)).toBe(false);
+  });
+});
+
+describe("formatIsoDateLong", () => {
+  it("spells out a report's as-of date", () => {
+    expect(formatIsoDateLong("2023-12-31")).toBe("December 31, 2023");
+  });
+
+  it("does not zero-pad the day", () => {
+    expect(formatIsoDateLong("2024-01-05")).toBe("January 5, 2024");
   });
 });

@@ -125,3 +125,15 @@ export function CheckIcon({ size = 16 }: { size?: number }) {
     </Glyph>
   );
 }
+
+/** Reports — the Trial Balance and General Ledger nav entry. */
+export function BarChartIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <path d="M3 3v18h18" />
+      <path d="M18 17V9" />
+      <path d="M13 17V5" />
+      <path d="M8 17v-3" />
+    </Glyph>
+  );
+}

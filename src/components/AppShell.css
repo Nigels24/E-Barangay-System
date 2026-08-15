@@ -43,3 +43,10 @@
   color: var(--muted);
   margin: var(--space-0-5) 0 0;
 }
+
+/* The app's own chrome, not part of any report — keep it off a printed page. */
+@media print {
+  .topbar {
+    display: none;
+  }
+}

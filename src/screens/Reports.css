@@ -1,0 +1,198 @@
+/**
+ * The reports screen. `.field-row` / `.field` / `.badges` / `.num` / `.hint`
+ * are reused from `Select.css` / `Badge.css` / `index.css` — see those files'
+ * own comments for why they live there. Everything below is specific to this
+ * screen's own layout (header, tabs, table shell, signature block), mirrored
+ * from `JournalVoucher.css`'s equivalents on the same tokens rather than
+ * imported from it — each screen owns its own layout classes, the same
+ * precedent `.form-error` already sets across both existing screens.
+ */
+
+.report-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  padding: var(--space-2) var(--space-2-5);
+  border-radius: var(--radius-sm);
+}
+
+.back-link:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.report-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* Same segmented-control shape as the voucher's debit/credit toggle. */
+.report-tabs {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-1);
+}
+
+.report-tabs button {
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.report-tabs button.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.report-picker {
+  margin-bottom: var(--space-4);
+}
+
+/* ---- Table shell ---- */
+
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.table-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table-card thead tr {
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.table-card th {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+}
+
+.table-card th:first-child {
+  padding-left: var(--space-5);
+}
+
+.table-card td {
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.table-card td:first-child {
+  padding-left: var(--space-5);
+}
+
+.table-card tfoot td {
+  border-bottom: none;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.table-card tbody tr:hover {
+  background: var(--surface-subtle);
+}
+
+.table-card .empty-row {
+  text-align: center;
+  padding: var(--space-8) 0;
+  color: var(--faint);
+}
+
+.form-error {
+  font-size: 13px;
+  color: var(--danger);
+  background: var(--danger-tint);
+  border-radius: var(--radius-md);
+  padding: var(--space-2-5) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+/* ---- General Ledger closing balance ---- */
+
+.report-closing {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2-5);
+  padding: var(--space-4);
+  background: var(--surface-subtle);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+}
+
+.report-closing .lbl {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.report-closing .val {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* ---- Signature block — D25: a blank line to sign on, never a name the app invented ---- */
+
+.signature-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+  padding-top: var(--space-2);
+}
+
+.signature-line {
+  flex: 1;
+  min-width: 200px;
+}
+
+.sig-rule {
+  border-bottom: 1px solid var(--ink);
+  height: 40px;
+}
+
+.sig-role {
+  margin-top: var(--space-1-5);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--muted);
+}

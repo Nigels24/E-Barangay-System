@@ -31,7 +31,8 @@
 .badge-closed,
 .badge-draft,
 .badge-posted,
-.badge-voided {
+.badge-voided,
+.badge-provisional {
   border: 1px solid transparent;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -45,10 +46,12 @@
   color: var(--primary);
 }
 
-/* Gold rather than red: a closed period and an unposted draft are both normal
-   states of the books, not faults. */
+/* Gold rather than red: a closed period, an unposted draft, and a provisional
+   account code are all normal, expected states — not faults — that still
+   need a second look before anyone treats them as final. */
 .badge-closed,
-.badge-draft {
+.badge-draft,
+.badge-provisional {
   background: var(--gold-tint);
   color: var(--gold-ink);
 }

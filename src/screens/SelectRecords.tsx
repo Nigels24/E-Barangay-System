@@ -40,9 +40,11 @@ export interface OpenedBooks {
 export function SelectRecords({
   db,
   onOpenBooks,
+  onViewReports,
 }: {
   db: EngineDb;
   onOpenBooks: (opened: OpenedBooks) => void;
+  onViewReports: (opened: OpenedBooks) => void;
 }) {
   const [barangays, setBarangays] = useState<BarangayOption[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -120,6 +122,16 @@ export function SelectRecords({
     ? (barangays?.find((b) => b.id === summary.barangayId)?.name ?? "")
     : "";
 
+  const opened: OpenedBooks | null = summary
+    ? {
+        barangayId: summary.barangayId,
+        barangayName: openedBarangay,
+        periodId: summary.periodId,
+        year: summary.year,
+        month: summary.month,
+      }
+    : null;
+
   return (
     <>
       <Card title="Select records" subtitle="Choose a barangay, year and month to open its books.">
@@ -190,20 +202,14 @@ export function SelectRecords({
                 {summary.entryCount} journal {summary.entryCount === 1 ? "entry" : "entries"}
               </p>
             </div>
-            <Button
-              variant="dark"
-              onClick={() =>
-                onOpenBooks({
-                  barangayId: summary.barangayId,
-                  barangayName: openedBarangay,
-                  periodId: summary.periodId,
-                  year: summary.year,
-                  month: summary.month,
-                })
-              }
-            >
-              Open the books →
-            </Button>
+            <div className="period-summary-actions">
+              <Button variant="ghost" onClick={() => opened && onViewReports(opened)}>
+                View reports
+              </Button>
+              <Button variant="dark" onClick={() => opened && onOpenBooks(opened)}>
+                Open the books →
+              </Button>
+            </div>
           </div>
         </Card>
       ) : null}

@@ -120,3 +120,14 @@ export function periodEndDate(year: number, month: number): string {
 export function isWithinPeriod(isoDate: string, year: number, month: number): boolean {
   return isoDate.startsWith(`${periodDatePrefix(year, month)}-`);
 }
+
+/**
+ * "2023-12-31" -> "December 31, 2023" — a report's own `asOfDate`, spelled
+ * out for its header. Parses the date the report actually computed rather
+ * than re-deriving one from year/month, so the label on screen can never
+ * name a different day than the figures under it were computed as of.
+ */
+export function formatIsoDateLong(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return `${monthLabel(month)} ${day}, ${year}`;
+}

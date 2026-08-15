@@ -5,7 +5,7 @@ import "./Badge.css";
  * `outline` is the prototype's neutral pill (barangay / year / month in the
  * journal header). The other two are **states**, not controls — see below.
  */
-export type BadgeTone = "outline" | "open" | "closed" | "draft" | "posted" | "voided";
+export type BadgeTone = "outline" | "open" | "closed" | "draft" | "posted" | "voided" | "provisional";
 
 type BadgeProps = {
   /** Optional leading glyph — an inline `<svg>`, tinted teal by the CSS. */
