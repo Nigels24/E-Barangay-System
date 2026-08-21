@@ -3,12 +3,19 @@ import { Badge } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Select, type SelectOption } from "../components/Select";
+import { TextField } from "../components/TextField";
 import { BuildingIcon, CalendarDaysIcon, CalendarIcon } from "../components/icons";
 import { MONTHS, formatPeriodLabel, selectableYears } from "../lib/calendar";
 import { errorMessage } from "../lib/errorMessage";
 import type { EngineDb } from "../lib/engine/types";
+import type { PeriodStatus } from "../db/schema";
 import { listBarangays, type BarangayOption } from "../lib/queries/barangays";
-import { openPeriodSummary, type PeriodSummary } from "../lib/queries/periods";
+import {
+  closePeriodAction,
+  openPeriodSummary,
+  reopenPeriodAction,
+  type PeriodSummary,
+} from "../lib/queries/periods";
 import "./SelectRecords.css";
 
 /**
@@ -35,6 +42,7 @@ export interface OpenedBooks {
   periodId: number;
   year: number;
   month: number;
+  status: PeriodStatus;
 }
 
 export function SelectRecords({
@@ -56,6 +64,15 @@ export function SelectRecords({
   const [summary, setSummary] = useState<PeriodSummary | null>(null);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
+
+  const [closeConfirming, setCloseConfirming] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
+
+  const [reopenConfirming, setReopenConfirming] = useState(false);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopening, setReopening] = useState(false);
+  const [reopenError, setReopenError] = useState<string | null>(null);
 
   // The year list is derived from today's date; recomputing it on every
   // keystroke of state would be pointless, and re-running it across midnight is
@@ -82,6 +99,15 @@ export function SelectRecords({
   const loaded = barangays !== null;
   const canProceed = barangayId !== "" && year !== "" && month !== "" && !opening;
 
+  /** Clears any in-progress close/reopen confirmation — a stale summary means a stale confirm step too. */
+  function resetPeriodActions() {
+    setCloseConfirming(false);
+    setCloseError(null);
+    setReopenConfirming(false);
+    setReopenReason("");
+    setReopenError(null);
+  }
+
   /**
    * Any change to the selection makes an already-shown period stale — it
    * describes the old choice. Clearing it is what stops the screen from
@@ -92,12 +118,14 @@ export function SelectRecords({
       set(value);
       setSummary(null);
       setOpenError(null);
+      resetPeriodActions();
     };
   }
 
   async function proceed() {
     setOpening(true);
     setOpenError(null);
+    resetPeriodActions();
     try {
       setSummary(await openPeriodSummary(db, Number(barangayId), Number(year), Number(month)));
     } catch (error: unknown) {
@@ -105,6 +133,35 @@ export function SelectRecords({
       setOpenError(errorMessage(error));
     } finally {
       setOpening(false);
+    }
+  }
+
+  async function confirmClose() {
+    if (!summary) return;
+    setClosing(true);
+    setCloseError(null);
+    try {
+      setSummary(await closePeriodAction(db, summary.periodId));
+      setCloseConfirming(false);
+    } catch (error: unknown) {
+      setCloseError(errorMessage(error));
+    } finally {
+      setClosing(false);
+    }
+  }
+
+  async function confirmReopen() {
+    if (!summary) return;
+    setReopening(true);
+    setReopenError(null);
+    try {
+      setSummary(await reopenPeriodAction(db, summary.periodId, reopenReason));
+      setReopenConfirming(false);
+      setReopenReason("");
+    } catch (error: unknown) {
+      setReopenError(errorMessage(error));
+    } finally {
+      setReopening(false);
     }
   }
 
@@ -129,6 +186,7 @@ export function SelectRecords({
         periodId: summary.periodId,
         year: summary.year,
         month: summary.month,
+        status: summary.status,
       }
     : null;
 
@@ -206,11 +264,59 @@ export function SelectRecords({
               <Button variant="ghost" onClick={() => opened && onViewReports(opened)}>
                 View reports
               </Button>
+              {summary.status === "open" ? (
+                closeConfirming ? (
+                  <>
+                    <Button variant="ghost" onClick={() => setCloseConfirming(false)} disabled={closing}>
+                      Cancel
+                    </Button>
+                    <Button variant="dark" onClick={() => void confirmClose()} disabled={closing}>
+                      {closing ? "Closing…" : "Confirm close"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="ghost" onClick={() => setCloseConfirming(true)}>
+                    Close period
+                  </Button>
+                )
+              ) : !reopenConfirming ? (
+                <Button variant="ghost" onClick={() => setReopenConfirming(true)}>
+                  Reopen
+                </Button>
+              ) : null}
               <Button variant="dark" onClick={() => opened && onOpenBooks(opened)}>
                 Open the books →
               </Button>
             </div>
           </div>
+
+          {closeError ? <p className="form-error">{closeError}</p> : null}
+
+          {reopenConfirming ? (
+            <div className="period-reopen-form">
+              <TextField
+                label="Reason for reopening"
+                hideLabel
+                value={reopenReason}
+                onChange={setReopenReason}
+                placeholder="Reason for reopening this period (required)"
+                disabled={reopening}
+              />
+              <div className="period-reopen-actions">
+                <Button variant="ghost" onClick={() => setReopenConfirming(false)} disabled={reopening}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="dark"
+                  onClick={() => void confirmReopen()}
+                  disabled={reopening || reopenReason.trim() === ""}
+                >
+                  {reopening ? "Reopening…" : "Confirm reopen"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {reopenError ? <p className="form-error">{reopenError}</p> : null}
         </Card>
       ) : null}
     </>

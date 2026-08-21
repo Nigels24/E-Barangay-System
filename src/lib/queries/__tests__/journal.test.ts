@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { seedEngineFixture } from "../../engine/__tests__/fixtures";
-import { seedPlaceholderUser } from "../../../db/seed/users";
-import { journalEntry } from "../../../db/schema";
+import { seedPlaceholderUser, PLACEHOLDER_USER_USERNAME } from "../../../db/seed/users";
+import { appUser, auditLog, journalEntry, journalEntryLine } from "../../../db/schema";
 import { closePeriod } from "../../engine/period";
+import { InvalidStatusError, ClosedPeriodError } from "../../engine/errors";
 import { createDraftEntry } from "../../engine/post";
 import { toCentavos } from "../../money";
 import {
@@ -12,6 +13,7 @@ import {
   listPeriodVouchers,
   postNewVoucher,
   summarisePeriod,
+  voidPostedVoucher,
   type PeriodLineRow,
 } from "../journal";
 
@@ -355,5 +357,188 @@ describe("summarisePeriod", () => {
     const totals = summarisePeriod(await listPeriodVouchers(db, periods.jan2024.id));
     expect(totals.postedDebitCentavos).toBe(totals.postedCreditCentavos);
     expect(totals.postedCount).toBe(3);
+  });
+});
+
+describe("voidPostedVoucher", () => {
+  it("voids the entry and posts its reversal, attributed to the placeholder user (D32)", async () => {
+    const { db, barangay, accounts, periods } = await fixture();
+    const posted = await postNewVoucher(
+      db,
+      electricBill(barangay.id, periods.jan2024.id, {
+        expense: accounts.electricity.id,
+        cash: accounts.cashInBank.id,
+      }),
+    );
+
+    const result = await voidPostedVoucher(db, {
+      entryId: posted.entryId,
+      reason: "Wrong account used",
+      reversalDate: "2024-01-31",
+      periodId: periods.jan2024.id,
+    });
+
+    expect(result.voided.status).toBe("voided");
+    expect(result.reversal.status).toBe("posted");
+    expect(result.reversal.reversesEntryId).toBe(posted.entryId);
+
+    const placeholder = await db.query
+      .select({ id: appUser.id })
+      .from(appUser)
+      .where(eq(appUser.username, PLACEHOLDER_USER_USERNAME))
+      .get();
+    const logs = await db.query.select().from(auditLog).where(eq(auditLog.recordId, posted.entryId)).all();
+    expect(logs.some((l) => l.action === "journal_entry.void" && l.userId === placeholder?.id)).toBe(true);
+  });
+
+  it("posts the reversal into the period passed in, never a different one (trap 2)", async () => {
+    const { db, barangay, accounts, periods } = await fixture();
+    const posted = await postNewVoucher(
+      db,
+      electricBill(barangay.id, periods.jan2024.id, {
+        expense: accounts.electricity.id,
+        cash: accounts.cashInBank.id,
+      }),
+    );
+
+    const result = await voidPostedVoucher(db, {
+      entryId: posted.entryId,
+      reason: "Duplicate entry",
+      reversalDate: "2024-01-31",
+      periodId: periods.jan2024.id,
+    });
+
+    expect(result.reversal.periodId).toBe(periods.jan2024.id);
+  });
+
+  it("the reversal's lines have debit and credit swapped from the original", async () => {
+    const { db, barangay, accounts, periods } = await fixture();
+    const posted = await postNewVoucher(
+      db,
+      electricBill(barangay.id, periods.jan2024.id, {
+        expense: accounts.electricity.id,
+        cash: accounts.cashInBank.id,
+      }),
+    );
+    const originalLines = await db.query
+      .select()
+      .from(journalEntryLine)
+      .where(eq(journalEntryLine.entryId, posted.entryId))
+      .all();
+
+    const result = await voidPostedVoucher(db, {
+      entryId: posted.entryId,
+      reason: "Correction",
+      reversalDate: "2024-01-31",
+      periodId: periods.jan2024.id,
+    });
+    const reversalLines = await db.query
+      .select()
+      .from(journalEntryLine)
+      .where(eq(journalEntryLine.entryId, result.reversal.id))
+      .all();
+
+    expect(reversalLines).toHaveLength(originalLines.length);
+    for (let i = 0; i < originalLines.length; i++) {
+      expect(reversalLines[i].debitCentavos).toBe(originalLines[i].creditCentavos);
+      expect(reversalLines[i].creditCentavos).toBe(originalLines[i].debitCentavos);
+    }
+  });
+
+  it("passes through the engine's refusal of a blank reason", async () => {
+    const { db, barangay, accounts, periods } = await fixture();
+    const posted = await postNewVoucher(
+      db,
+      electricBill(barangay.id, periods.jan2024.id, {
+        expense: accounts.electricity.id,
+        cash: accounts.cashInBank.id,
+      }),
+    );
+
+    await expect(
+      voidPostedVoucher(db, {
+        entryId: posted.entryId,
+        reason: "",
+        reversalDate: "2024-01-31",
+        periodId: periods.jan2024.id,
+      }),
+    ).rejects.toThrow(InvalidStatusError);
+  });
+
+  it("passes through the engine's refusal to void an already-voided entry", async () => {
+    const { db, barangay, accounts, periods } = await fixture();
+    const posted = await postNewVoucher(
+      db,
+      electricBill(barangay.id, periods.jan2024.id, {
+        expense: accounts.electricity.id,
+        cash: accounts.cashInBank.id,
+      }),
+    );
+    await voidPostedVoucher(db, {
+      entryId: posted.entryId,
+      reason: "First void",
+      reversalDate: "2024-01-31",
+      periodId: periods.jan2024.id,
+    });
+
+    await expect(
+      voidPostedVoucher(db, {
+        entryId: posted.entryId,
+        reason: "Second void",
+        reversalDate: "2024-01-31",
+        periodId: periods.jan2024.id,
+      }),
+    ).rejects.toThrow(InvalidStatusError);
+  });
+
+  it("passes through the engine's refusal to void a draft entry", async () => {
+    const { db, barangay, user, accounts, periods } = await fixture();
+    const draft = await createDraftEntry(db, {
+      barangayId: barangay.id,
+      periodId: periods.jan2024.id,
+      entryDate: "2024-01-31",
+      book: "GJ",
+      particulars: "Never posted",
+      createdBy: user.id,
+      lines: [
+        { accountId: accounts.electricity.id, side: "debit", amountCentavos: toCentavos(1000) },
+        { accountId: accounts.cashInBank.id, side: "credit", amountCentavos: toCentavos(1000) },
+      ],
+    });
+
+    await expect(
+      voidPostedVoucher(db, {
+        entryId: draft.id,
+        reason: "x",
+        reversalDate: "2024-01-31",
+        periodId: periods.jan2024.id,
+      }),
+    ).rejects.toThrow(InvalidStatusError);
+  });
+
+  it("passes through the engine's refusal to post a reversal into a closed period", async () => {
+    const { db, barangay, accounts, periods } = await fixture();
+    const posted = await postNewVoucher(
+      db,
+      electricBill(barangay.id, periods.jan2024.id, {
+        expense: accounts.electricity.id,
+        cash: accounts.cashInBank.id,
+      }),
+    );
+    const placeholder = await db.query
+      .select({ id: appUser.id })
+      .from(appUser)
+      .where(eq(appUser.username, PLACEHOLDER_USER_USERNAME))
+      .get();
+    await closePeriod(db, periods.jan2024.id, placeholder!.id);
+
+    await expect(
+      voidPostedVoucher(db, {
+        entryId: posted.entryId,
+        reason: "x",
+        reversalDate: "2024-01-31",
+        periodId: periods.jan2024.id,
+      }),
+    ).rejects.toThrow(ClosedPeriodError);
   });
 });

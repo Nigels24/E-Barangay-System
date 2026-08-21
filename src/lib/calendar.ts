@@ -121,6 +121,26 @@ export function isWithinPeriod(isoDate: string, year: number, month: number): bo
   return isoDate.startsWith(`${periodDatePrefix(year, month)}-`);
 }
 
+/** "YYYY-MM-DD" in the local calendar day — never `toISOString()`, which is UTC and can name the wrong day near midnight. */
+function toIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * A sane default for a date field clamped to a period: today, if today falls
+ * inside it, otherwise the period's last day. Used for a reversal's date,
+ * which is normally "today" but must never default outside the period it's
+ * being posted into. `today` is a parameter for the same reason
+ * {@link selectableYears} takes one — testable without freezing the clock.
+ */
+export function defaultDateInPeriod(year: number, month: number, today: Date = new Date()): string {
+  const todayIso = toIsoDate(today);
+  return isWithinPeriod(todayIso, year, month) ? todayIso : periodEndDate(year, month);
+}
+
 /**
  * "2023-12-31" -> "December 31, 2023" — a report's own `asOfDate`, spelled
  * out for its header. Parses the date the report actually computed rather

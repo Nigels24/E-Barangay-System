@@ -16,6 +16,7 @@ import {
   type JournalEntryStatus,
 } from "../../db/schema";
 import { createDraftEntry, postEntry, type DraftLineInput } from "../engine/post";
+import { voidEntry } from "../engine/void";
 import type { EngineDb } from "../engine/types";
 import { sumCentavos } from "../money";
 import { requirePostingUserId } from "./users";
@@ -270,4 +271,34 @@ export async function postNewVoucher(
     );
   }
   return { entryId: posted.id, jevNo: posted.jevNo };
+}
+
+export interface VoidVoucherInput {
+  entryId: number;
+  reason: string;
+  /** The date the reversal itself is dated. */
+  reversalDate: string;
+  /** The period the reversal posts into — always the period on screen (see PLAN.md T-010 trap 2), never a picker. */
+  periodId: number;
+}
+
+/**
+ * Voids a posted voucher and posts its reversal, as one call from the
+ * screen's point of view.
+ *
+ * The user is resolved here, not passed in, for the same reason
+ * {@link postNewVoucher} resolves it — there is exactly one answer today
+ * (D32) and exactly one place that decides it. Everything else — the
+ * reversal's swapped lines, its own JEV number, the atomic batch — is
+ * `voidEntry`'s job; this is the seam, not a second copy of the logic.
+ */
+export async function voidPostedVoucher(db: EngineDb, input: VoidVoucherInput) {
+  const userId = await requirePostingUserId(db);
+  return voidEntry(db, {
+    entryId: input.entryId,
+    reason: input.reason,
+    voidedBy: userId,
+    reversalDate: input.reversalDate,
+    reversalPeriodId: input.periodId,
+  });
 }

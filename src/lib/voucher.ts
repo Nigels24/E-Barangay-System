@@ -21,7 +21,7 @@
  * looked fine and the app then rejected my work" is the whole usability of the
  * screen. If the two ever disagree, the engine is right and this is a bug.
  */
-import type { JournalBook } from "../db/schema";
+import type { JournalBook, PeriodStatus } from "../db/schema";
 import type { DraftLineInput } from "./engine/post";
 import { isWithinPeriod, formatPeriodLabel } from "./calendar";
 import { formatPeso, sumCentavos, toCentavos } from "./money";
@@ -52,6 +52,7 @@ export interface VoucherHeaderForm {
 export interface VoucherPeriod {
   year: number;
   month: number;
+  status: PeriodStatus;
 }
 
 /**
@@ -154,6 +155,10 @@ export function voucherProblems(
 ): string[] {
   const problems: string[] = [];
   const periodLabel = formatPeriodLabel(period.year, period.month);
+
+  if (period.status === "closed") {
+    problems.push("This period is closed and cannot accept new postings. Reopen it from the period selection screen first.");
+  }
 
   if (header.particulars.trim() === "") {
     problems.push("Write what this voucher is for in Particulars.");

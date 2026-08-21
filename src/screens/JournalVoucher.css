@@ -285,3 +285,31 @@
   padding: var(--space-8) 0;
   color: var(--faint);
 }
+
+/* ---- Void, inline per row (T-010) ---- */
+
+.voucher-void-cell {
+  min-width: 160px;
+}
+
+.voucher-void-closed {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.voucher-void-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 220px;
+}
+
+.voucher-void-form .field {
+  margin: 0;
+}
+
+.voucher-void-actions {
+  display: flex;
+  gap: var(--space-2);
+}

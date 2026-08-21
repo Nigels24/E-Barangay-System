@@ -12,7 +12,7 @@ import {
   type VoucherLineForm,
 } from "../voucher";
 
-const PERIOD = { year: 2023, month: 12 };
+const PERIOD = { year: 2023, month: 12, status: "open" as const };
 
 function line(over: Partial<VoucherLineForm> = {}): VoucherLineForm {
   return { key: "k", accountId: "1", side: "debit", amount: "100.00", ...over };
@@ -218,6 +218,14 @@ describe("voucherProblems", () => {
     const problems = voucherProblems(emptyHeader("2023-12-01"), [emptyLine("a"), emptyLine("b")], PERIOD);
     expect(problems.some((p) => p.includes("differ by"))).toBe(false);
     expect(problems.some((p) => p.includes("for zero"))).toBe(true);
+  });
+
+  it("refuses an otherwise-valid voucher when the period is closed", () => {
+    const { header, lines } = balanced();
+    const closedPeriod = { ...PERIOD, status: "closed" as const };
+    const problems = voucherProblems(header, lines, closedPeriod);
+    expect(problems.some((p) => p.includes("closed"))).toBe(true);
+    expect(canPost(header, lines, closedPeriod)).toBe(false);
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   EARLIEST_SELECTABLE_YEAR,
   MONTHS,
+  defaultDateInPeriod,
   formatIsoDateLong,
   formatPeriodLabel,
   isWithinPeriod,
@@ -109,6 +110,25 @@ describe("isWithinPeriod", () => {
   it("rejects an empty or malformed date rather than passing it through", () => {
     expect(isWithinPeriod("", 2023, 12)).toBe(false);
     expect(isWithinPeriod("not a date", 2023, 12)).toBe(false);
+  });
+});
+
+describe("defaultDateInPeriod", () => {
+  it("defaults to today when today falls inside the period", () => {
+    // Local-time constructor, not a UTC "Z" string — this is testing a
+    // local-calendar-day rule, and a UTC timestamp near midnight could name
+    // the wrong day depending on the machine running the test.
+    expect(defaultDateInPeriod(2023, 12, new Date(2023, 11, 15))).toBe("2023-12-15");
+  });
+
+  it("falls back to the period's last day when today falls outside it", () => {
+    expect(defaultDateInPeriod(2023, 12, new Date(2024, 0, 3))).toBe("2023-12-31");
+    expect(defaultDateInPeriod(2024, 2, new Date(2023, 11, 1))).toBe("2024-02-29"); // 2024 is a leap year
+  });
+
+  it("falls back on the period's boundary days too", () => {
+    expect(defaultDateInPeriod(2023, 12, new Date(2023, 11, 1))).toBe("2023-12-01");
+    expect(defaultDateInPeriod(2023, 12, new Date(2023, 11, 31))).toBe("2023-12-31");
   });
 });
 

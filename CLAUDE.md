@@ -43,14 +43,14 @@ ebarangay-books/
 ├── e2e/drive.py             WebDriver harness (debug builds only — see D33)
 ├── docs/decisions.md        D1–D33, binding client decisions
 ├── scripts/sync-barangays.ts
-├── SYSTEM_FLOW.md           build order + what's done
-└── .agent-comms/            agent handoff files — not product code
+└── SYSTEM_FLOW.md           build order, what's done, and what's left
 ```
 
 **Read these before touching their area:**
 
 | Path | Why |
 |---|---|
+| `SYSTEM_FLOW.md` | The single progress record: what's done (Phases 1–3.6, T-001–T-010, all Reviewer-PASSed), what's left (3.7 onward), and open risks/deferred items. **Read this first, every session** — it's what lets a session with no memory of the last one continue correctly. |
 | `docs/decisions.md` | D1–D33 are binding decisions made with the client. Not suggestions. Cite the D-number when one applies. |
 | `src/lib/money.ts` | The only place peso ⇄ centavo conversion is allowed to happen. |
 | `src/db/schema.ts` | 13 tables. Triggers here enforce immutability at the database level. |
@@ -68,7 +68,7 @@ npm run tauri dev        # the real desktop app
 npm run build            # tsc -b && vite build
 npx tsc --noEmit         # typecheck
 npm run lint             # oxlint
-npx vitest run           # 262 passing / 25 files at T-007 baseline
+npx vitest run           # 281 passing / 25 files at T-010 baseline
 npm run db:generate      # drizzle-kit generate
 cd src-tauri && cargo check    # if any Rust was touched
 ```
@@ -78,18 +78,41 @@ Run these as **plain commands**. Anything with shell expansion —
 confirmation prompt and stalls the session until a human clicks Yes. If you need
 an exit code, run the command alone and read its output.
 
-### The three-agent workflow
+### Single-session workflow
 
-| Pane | Role file | Does |
-|---|---|---|
-| Coordinator | `.agent-comms/ROLE-COORDINATOR.md` | plans with the user, routes, closes |
-| Code Implementor | `.agent-comms/ROLE-IMPLEMENTOR.md` | writes and tests the code |
-| Code Reviewer | `.agent-comms/ROLE-REVIEWER.md` | PASS/FAIL gate |
+This project used to run as three separate Nex panes (Coordinator / Code
+Implementor / Code Reviewer) handing work off via files in `.agent-comms/`.
+That folder is gone (deleted to save context, Aug 2026) and the project now
+runs as one Claude session per task. `SYSTEM_FLOW.md` is the sole progress
+record — it replaces what `.agent-comms/PLAN.md`, `REVIEW.md`, and
+`HANDOFF.md` used to do, and its "Remaining work" section is the backlog.
 
-Protocol: `.agent-comms/HANDOFF.md`. Progress: `SYSTEM_FLOW.md`.
+For each task:
 
-Only a Reviewer `PASS` closes a task. All re-work routes through the
-Coordinator — the Reviewer never messages the Implementor directly.
+1. **Read `SYSTEM_FLOW.md`** — "Right now" for the latest state, "Remaining
+   work" for what's next, "Deferred" and "Open risks" for things already
+   decided or flagged. Read the relevant `docs/decisions.md` section before
+   touching an area it covers.
+2. **Plan before writing code** — for anything nontrivial, state the
+   approach and any judgment calls (the equivalent of what `PLAN.md`'s
+   "traps" sections used to capture) before implementing, so a real
+   decision doesn't get made silently mid-diff.
+3. **Implement**, following the non-negotiable rules below.
+4. **Self-review before calling it done** — rerun the full validation loop
+   (commands above, including the golden test and `cargo check` if Rust
+   changed), read your own diff for the same things a strict reviewer would
+   check (scope creep, money-boundary violations, weakened tests, trigger
+   workarounds), and — for anything touching the UI — actually look at the
+   screen (see "UI has zero automated coverage" below).
+5. **Update `SYSTEM_FLOW.md`** — move the item from ⬜/🔄 to ✅, update
+   "Right now," and note anything left open, the same level of detail the
+   old REVIEW.md verdicts recorded. This is what makes the next session
+   (with no memory of this one) able to pick up correctly.
+
+There is no separate Reviewer to gate a `PASS` — the rigor that role
+provided (independent diff read, live verification, checking non-negotiables
+weren't quietly bent) is now this session's own job before reporting a task
+done.
 
 ### Rules that are not negotiable
 
@@ -139,9 +162,13 @@ Violating one is an automatic FAIL.
   assertions prove a string exists, not that it is legible or in the right
   column.
 
-- **Interactive verification that requires a write** — posting something,
-  confirming a refusal, checking a value survives relaunch — is the user's job.
-  Say so in the notes and let the Coordinator arrange it.
+- **Interactive verification that requires a write against the real books** —
+  posting something, confirming a refusal, checking a value survives
+  relaunch — is the user's job, not something to attempt via a throwaway
+  redirect without saying so first. Verification against a throwaway/dev
+  database (a separate SQLite file, `APP_DB_URL`/`src-tauri`'s `DB_URL`
+  redirected together, reverted afterward) is fine and is how T-007–T-010
+  were each verified — see `SYSTEM_FLOW.md`'s history for the procedure.
 
 ### UI has zero automated coverage
 
@@ -153,6 +180,7 @@ that reads the database.
 
 ### Git
 
-**No agent runs `git add`, `git commit`, or `git push`.** The user commits
-personally, after the Coordinator reports a PASS. Leave work uncommitted —
-`git diff` is what the Reviewer reviews. Read-only git is fine.
+**Never run `git add`, `git commit`, or `git push` unless the user explicitly
+asks.** The user commits personally, once a task is done and self-reviewed.
+Leave work uncommitted so `git diff` stays inspectable. Read-only git is
+fine.

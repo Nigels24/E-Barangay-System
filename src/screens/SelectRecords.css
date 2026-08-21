@@ -48,3 +48,20 @@
   margin-top: var(--space-2-5);
   margin-bottom: 0;
 }
+
+/* The reason field shown once "Reopen" is clicked (D22 requires a written reason). */
+.period-reopen-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2-5);
+  margin-top: var(--space-3);
+}
+
+.period-reopen-form .field {
+  flex: 1;
+}
+
+.period-reopen-actions {
+  display: flex;
+  gap: var(--space-2-5);
+}

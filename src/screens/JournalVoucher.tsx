@@ -15,8 +15,15 @@ import {
   TrashIcon,
   WalletIcon,
 } from "../components/icons";
-import type { JournalBook, JournalEntryStatus } from "../db/schema";
-import { formatPeriodLabel, monthLabel, periodEndDate, periodStartDate } from "../lib/calendar";
+import type { JournalBook, JournalEntryStatus, PeriodStatus } from "../db/schema";
+import {
+  defaultDateInPeriod,
+  formatPeriodLabel,
+  isWithinPeriod,
+  monthLabel,
+  periodEndDate,
+  periodStartDate,
+} from "../lib/calendar";
 import { errorMessage } from "../lib/errorMessage";
 import type { EngineDb } from "../lib/engine/types";
 import { accountLabel, listPostableAccounts, type AccountOption } from "../lib/queries/accounts";
@@ -24,6 +31,7 @@ import {
   listPeriodVouchers,
   postNewVoucher,
   summarisePeriod,
+  voidPostedVoucher,
   type PeriodVoucher,
   type PostedVoucher,
 } from "../lib/queries/journal";
@@ -66,6 +74,7 @@ interface JournalVoucherProps {
   periodId: number;
   year: number;
   month: number;
+  status: PeriodStatus;
   onBack: () => void;
   onViewReports: () => void;
 }
@@ -86,6 +95,7 @@ export function JournalVoucher({
   periodId,
   year,
   month,
+  status,
   onBack,
   onViewReports,
 }: JournalVoucherProps) {
@@ -109,6 +119,14 @@ export function JournalVoucher({
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
   const [lastPosted, setLastPosted] = useState<PostedVoucher | null>(null);
+
+  // Which posted voucher's row is showing the void confirm form, if any —
+  // only one at a time, same "one inline confirm open" shape T-008 used.
+  const [voidingEntryId, setVoidingEntryId] = useState<number | null>(null);
+  const [voidReason, setVoidReason] = useState("");
+  const [voidReversalDate, setVoidReversalDate] = useState("");
+  const [voiding, setVoiding] = useState(false);
+  const [voidError, setVoidError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,6 +236,41 @@ export function JournalVoucher({
     }
   }
 
+  function startVoid(entryId: number) {
+    setVoidingEntryId(entryId);
+    setVoidReason("");
+    setVoidReversalDate(defaultDateInPeriod(year, month));
+    setVoidError(null);
+  }
+
+  function cancelVoid() {
+    setVoidingEntryId(null);
+    setVoidReason("");
+    setVoidReversalDate("");
+    setVoidError(null);
+  }
+
+  /** Void the entry the confirm form is open on, then reload so both the voided original and its reversal show up. */
+  async function confirmVoid() {
+    if (voidingEntryId === null) return;
+    setVoiding(true);
+    setVoidError(null);
+    try {
+      await voidPostedVoucher(db, {
+        entryId: voidingEntryId,
+        reason: voidReason,
+        reversalDate: voidReversalDate,
+        periodId,
+      });
+      cancelVoid();
+      await reloadVouchers();
+    } catch (error: unknown) {
+      setVoidError(errorMessage(error));
+    } finally {
+      setVoiding(false);
+    }
+  }
+
   const accountsLoaded = accounts !== null;
   const vouchersLoaded = vouchers !== null;
 
@@ -227,7 +280,7 @@ export function JournalVoucher({
   }));
 
   const totalsNow = voucherTotals(lines);
-  const problems = voucherProblems(header, lines, { year, month });
+  const problems = voucherProblems(header, lines, { year, month, status });
   const postable = problems.length === 0 && !posting;
 
   const periodTotals = vouchers ? summarisePeriod(vouchers) : null;
@@ -235,6 +288,8 @@ export function JournalVoucher({
   const tableRows = (vouchers ?? []).flatMap((voucher) =>
     voucher.lines.map((line) => ({
       key: `${voucher.entryId}-${line.lineNo}`,
+      entryId: voucher.entryId,
+      lineNo: line.lineNo,
       date: voucher.entryDate,
       jevNo: voucher.jevNo,
       particulars: voucher.particulars,
@@ -255,6 +310,9 @@ export function JournalVoucher({
           <Badge icon={<BuildingIcon />}>{barangayName}</Badge>
           <Badge icon={<CalendarIcon />}>{year}</Badge>
           <Badge icon={<CalendarDaysIcon />}>{monthLabel(month)}</Badge>
+          <Badge tone={status === "open" ? "open" : "closed"}>
+            {status === "open" ? "Open for posting" : "Closed"}
+          </Badge>
           <Button variant="ghost" size="sm" onClick={onViewReports}>
             <BarChartIcon size={14} /> View reports
           </Button>
@@ -430,6 +488,7 @@ export function JournalVoucher({
       </Card>
 
       {vouchersError ? <p className="form-error">The period's vouchers could not be read. {vouchersError}</p> : null}
+      {voidError ? <p className="form-error">{voidError}</p> : null}
 
       <div className="table-card">
         <div className="table-scroll">
@@ -443,6 +502,7 @@ export function JournalVoucher({
                 <th>Account</th>
                 <th style={{ textAlign: "right" }}>Debit</th>
                 <th style={{ textAlign: "right" }}>Credit</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -458,11 +518,64 @@ export function JournalVoucher({
                     <td style={{ color: "var(--muted)" }}>{row.accountLabel}</td>
                     <td className="num">{row.debitCentavos ? formatPeso(row.debitCentavos) : "—"}</td>
                     <td className="num">{row.creditCentavos ? formatPeso(row.creditCentavos) : "—"}</td>
+                    <td className="voucher-void-cell">
+                      {row.lineNo === 1 && row.status === "posted" ? (
+                        status === "closed" ? (
+                          <p className="voucher-void-closed">
+                            This period is closed — void by reopening the period first.
+                          </p>
+                        ) : voidingEntryId === row.entryId ? (
+                          <div className="voucher-void-form">
+                            <TextField
+                              label={`Reason for voiding ${row.jevNo ?? "this voucher"}`}
+                              hideLabel
+                              value={voidReason}
+                              onChange={setVoidReason}
+                              placeholder="Reason for voiding (required)"
+                              disabled={voiding}
+                            />
+                            <TextField
+                              label={`Reversal date for ${row.jevNo ?? "this voucher"}`}
+                              hideLabel
+                              type="date"
+                              value={voidReversalDate}
+                              onChange={setVoidReversalDate}
+                              min={periodStartDate(year, month)}
+                              max={periodEndDate(year, month)}
+                              disabled={voiding}
+                            />
+                            <div className="voucher-void-actions">
+                              <Button variant="ghost" size="sm" onClick={cancelVoid} disabled={voiding}>
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="dark"
+                                size="sm"
+                                onClick={() => {
+                                  void confirmVoid();
+                                }}
+                                disabled={
+                                  voiding ||
+                                  voidReason.trim() === "" ||
+                                  !isWithinPeriod(voidReversalDate, year, month)
+                                }
+                              >
+                                {voiding ? "Voiding…" : "Confirm void"}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button variant="ghost" size="sm" onClick={() => startVoid(row.entryId)}>
+                            Void
+                          </Button>
+                        )
+                      ) : null}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="empty-row">
+                  <td colSpan={8} className="empty-row">
                     {vouchersLoaded
                       ? `No vouchers recorded for ${formatPeriodLabel(year, month)} — post the first one above.`
                       : "Loading vouchers…"}

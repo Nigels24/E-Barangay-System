@@ -12,8 +12,9 @@
  */
 import { count, eq } from "drizzle-orm";
 import { journalEntry, type PeriodStatus } from "../../db/schema";
-import { ensurePeriod } from "../engine/period";
+import { closePeriod, ensurePeriod, reopenPeriod } from "../engine/period";
 import type { EngineDb } from "../engine/types";
+import { requirePostingUserId } from "./users";
 
 /** A period plus the one number a picker screen shows about it. */
 export interface PeriodSummary {
@@ -69,6 +70,21 @@ export async function countPeriodEntries(db: EngineDb, periodId: number): Promis
   return row?.entries ?? 0;
 }
 
+/** A period row plus its entry count, in the shape a screen renders. */
+async function toSummary(
+  db: EngineDb,
+  period: { id: number; barangayId: number; year: number; month: number; status: PeriodStatus },
+): Promise<PeriodSummary> {
+  return {
+    periodId: period.id,
+    barangayId: period.barangayId,
+    year: period.year,
+    month: period.month,
+    status: period.status,
+    entryCount: await countPeriodEntries(db, period.id),
+  };
+}
+
 /**
  * Opens the period for (barangay, year, month) if it isn't open already, and
  * returns it with its entry count.
@@ -88,13 +104,31 @@ export async function openPeriodSummary(
   assertSelection(barangayId, year, month);
 
   const period = await ensurePeriod(db, barangayId, year, month);
+  return toSummary(db, period);
+}
 
-  return {
-    periodId: period.id,
-    barangayId: period.barangayId,
-    year: period.year,
-    month: period.month,
-    status: period.status,
-    entryCount: await countPeriodEntries(db, period.id),
-  };
+/**
+ * Closes an open period from a screen. The actor is resolved the same way
+ * every other write in the app resolves it (D32) — a screen never passes an
+ * id, so it can never attribute the close to the wrong actor.
+ */
+export async function closePeriodAction(db: EngineDb, periodId: number): Promise<PeriodSummary> {
+  const userId = await requirePostingUserId(db);
+  const period = await closePeriod(db, periodId, userId);
+  return toSummary(db, period);
+}
+
+/**
+ * Reopens a closed period given a written reason (D22). `reopenPeriod` itself
+ * is what refuses a blank reason — this wrapper adds nothing but the actor and
+ * the refreshed summary a screen needs to re-render.
+ */
+export async function reopenPeriodAction(
+  db: EngineDb,
+  periodId: number,
+  reason: string,
+): Promise<PeriodSummary> {
+  const userId = await requirePostingUserId(db);
+  const period = await reopenPeriod(db, periodId, userId, reason);
+  return toSummary(db, period);
 }

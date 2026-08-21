@@ -91,6 +91,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
             periodId={screen.periodId}
             year={screen.year}
             month={screen.month}
+            status={screen.status}
             onBack={() => setScreen({ name: "select" })}
             onViewReports={() =>
               setScreen({
@@ -101,6 +102,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
                 periodId: screen.periodId,
                 year: screen.year,
                 month: screen.month,
+                status: screen.status,
               })
             }
           />
@@ -120,6 +122,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
                     periodId: screen.periodId,
                     year: screen.year,
                     month: screen.month,
+                    status: screen.status,
                   })
                 : setScreen({ name: "select" })
             }
