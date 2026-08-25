@@ -60,6 +60,12 @@ fn migrations() -> Vec<Migration> {
       sql: include_str!("../../drizzle/0003_tense_jazinda.sql"),
       kind: MigrationKind::Up,
     },
+    Migration {
+      version: 5,
+      description: "0004_gifted_spencer_smythe",
+      sql: include_str!("../../drizzle/0004_gifted_spencer_smythe.sql"),
+      kind: MigrationKind::Up,
+    },
   ]
 }
 

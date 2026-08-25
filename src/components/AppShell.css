@@ -44,9 +44,28 @@
   margin: var(--space-0-5) 0 0;
 }
 
-/* The app's own chrome, not part of any report — keep it off a printed page. */
+/*
+ * The app's own chrome, not part of any report — keep it off a printed
+ * page, and let the page's own margins do the work `.wrap`'s screen padding
+ * was doing, rather than stacking both.
+ */
 @media print {
   .topbar {
     display: none;
   }
+
+  .wrap,
+  .wrap.wrap-wide {
+    max-width: none;
+    padding: 0;
+  }
+}
+
+/*
+ * A consistent printed margin regardless of what the OS print dialog
+ * defaults to. Paper size is deliberately left unset — that is the one
+ * choice this app has no business making for the office printer.
+ */
+@page {
+  margin: 1.5cm;
 }

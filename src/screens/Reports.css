@@ -70,6 +70,14 @@
   margin-bottom: var(--space-4);
 }
 
+/* Which account the General Ledger below is for — the account Select is
+   itself hidden in print (`.report-picker`), so this is what states it on paper. */
+.report-account-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+}
+
 /* ---- Table shell ---- */
 
 .table-card {
@@ -189,10 +197,85 @@
   height: 40px;
 }
 
+/* The signatory's printed name, once one is on file (D25) — sits between the
+   line they physically sign and the designation/role caption below it. */
+.sig-name {
+  margin-top: var(--space-1-5);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink);
+}
+
 .sig-role {
   margin-top: var(--space-1-5);
   font-size: 12px;
   font-weight: 500;
   text-align: center;
   color: var(--muted);
+}
+
+/*
+ * ---- Print ----
+ *
+ * `window.print()` (T-007) always printed *something*; this is what makes
+ * it print a document rather than a screenshot of the app. Everything
+ * interactive — the Back link, the tab bar, the Print button itself, the
+ * General Ledger's account picker — has no place on paper, and the badge
+ * pills (built for a screen, with icons and coloured fills) are replaced by
+ * `.print-title`, plain running text carrying the same barangay name. The
+ * on-screen `.hint` line is deliberately left alone: it already states the
+ * report's own as-of date or period in a full sentence, which is exactly
+ * the kind of note a real printed statement carries too.
+ *
+ * `.print-title` states the report's name and the barangay — nothing more.
+ * It does NOT reproduce a government letterhead ("Republic of the
+ * Philippines", the province, etc.): no such wording has ever been
+ * confirmed against the client's own paper forms, and printing an invented
+ * one on an official document would be worse than printing none, the same
+ * reasoning D25 applies to a signatory's name. Add it here if that wording
+ * is ever confirmed — see SYSTEM_FLOW.md.
+ */
+.print-title {
+  display: none;
+}
+
+@media print {
+  .back-link,
+  .report-tabs,
+  .report-toolbar-row > .btn,
+  .report-picker,
+  .badges {
+    display: none;
+  }
+
+  .print-title {
+    display: block;
+    margin-bottom: var(--space-3);
+  }
+
+  .print-title h2 {
+    font-size: 17px;
+    margin: 0;
+  }
+
+  .print-title p {
+    font-size: 13px;
+    color: var(--ink);
+    margin: var(--space-0-5) 0 0;
+  }
+
+  .table-card {
+    box-shadow: none;
+    border: 1px solid #999;
+    break-inside: avoid;
+  }
+
+  .table-card tbody tr {
+    break-inside: avoid;
+  }
+
+  .signature-block {
+    break-inside: avoid;
+  }
 }

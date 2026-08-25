@@ -1,3 +1,11 @@
+/* Chart of accounts (D9) is not barangay-scoped, so it sits above the
+   picker rather than on the period card the other registers use. */
+.select-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4);
+}
+
 /* The opened period, shown under the pickers once Proceed has run. */
 
 .period-summary-head {

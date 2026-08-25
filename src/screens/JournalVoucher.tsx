@@ -6,12 +6,16 @@ import { Select, type SelectOption } from "../components/Select";
 import { TextField } from "../components/TextField";
 import {
   ArrowLeftIcon,
+  BankIcon,
   BarChartIcon,
+  BoxIcon,
   BuildingIcon,
   CalendarDaysIcon,
   CalendarIcon,
   CheckIcon,
+  ListIcon,
   PlusIcon,
+  SignatureIcon,
   TrashIcon,
   WalletIcon,
 } from "../components/icons";
@@ -77,6 +81,11 @@ interface JournalVoucherProps {
   status: PeriodStatus;
   onBack: () => void;
   onViewReports: () => void;
+  onOpenFixedAssets: () => void;
+  onOpenAdvances: () => void;
+  onOpenBankReconciliation: () => void;
+  onOpenSignatories: () => void;
+  onOpenChartOfAccounts: () => void;
 }
 
 /**
@@ -98,6 +107,11 @@ export function JournalVoucher({
   status,
   onBack,
   onViewReports,
+  onOpenFixedAssets,
+  onOpenAdvances,
+  onOpenBankReconciliation,
+  onOpenSignatories,
+  onOpenChartOfAccounts,
 }: JournalVoucherProps) {
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
   const [accountsError, setAccountsError] = useState<string | null>(null);
@@ -315,6 +329,21 @@ export function JournalVoucher({
           </Badge>
           <Button variant="ghost" size="sm" onClick={onViewReports}>
             <BarChartIcon size={14} /> View reports
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenFixedAssets}>
+            <BoxIcon size={14} /> Fixed assets
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenAdvances}>
+            <WalletIcon size={14} /> Advances
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenBankReconciliation}>
+            <BankIcon size={14} /> Bank reconciliation
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenSignatories}>
+            <SignatureIcon size={14} /> Signatories
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenChartOfAccounts}>
+            <ListIcon size={14} /> Chart of accounts
           </Button>
         </div>
       </div>

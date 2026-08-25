@@ -16,6 +16,13 @@ body {
   color: var(--ink);
 }
 
+/* A printed page is white paper, not the app's own tinted background. */
+@media print {
+  body {
+    background: #fff;
+  }
+}
+
 button {
   font-family: inherit;
   cursor: pointer;

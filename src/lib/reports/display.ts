@@ -1,3 +1,5 @@
+import type { ReconcilingItemType } from "../../db/schema";
+
 /**
  * Turns a signed running balance into the Dr/Cr a bookkeeper actually reads
  * off a ledger page.
@@ -22,4 +24,20 @@ export interface SignedBalance {
 /** Zero is `Dr`, matching `trialBalance.ts`'s `net >= 0 ? debit : credit`. */
 export function signedBalance(centavos: number): SignedBalance {
   return centavos < 0 ? { absCentavos: -centavos, side: "Cr" } : { absCentavos: centavos, side: "Dr" };
+}
+
+/** The fixed reconciling-item categories (D4), as a bookkeeper reads them rather than as the database stores them. */
+const RECONCILING_ITEM_TYPE_LABELS: Record<ReconcilingItemType, string> = {
+  checks_issued_not_taken_up: "Checks issued, not yet taken up by bank",
+  checks_issued_overstated: "Checks issued, overstated",
+  deposit_understated: "Deposit understated",
+  deposit_overstated: "Deposit overstated",
+  debit_memo: "Debit memo",
+  credit_memo: "Credit memo",
+  prior_years_adjustment: "Prior year's adjustment",
+  other: "Other reconciling item",
+};
+
+export function reconcilingItemTypeLabel(itemType: ReconcilingItemType): string {
+  return RECONCILING_ITEM_TYPE_LABELS[itemType];
 }

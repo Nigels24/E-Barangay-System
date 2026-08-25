@@ -101,14 +101,24 @@ export type SignatoryRole = "prepared_by" | "certified_by" | "approved_by";
  * Report signatories per barangay. Officials change over the years the
  * client will run this system — never hardcode a name into a report template.
  */
-export const signatory = sqliteTable("signatory", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  barangayId: integer("barangay_id").notNull().references(() => barangay.id),
-  role: text("role").$type<SignatoryRole>().notNull(),
-  name: text("name").notNull(),
-  designation: text("designation").notNull(),
-  effectiveFrom: text("effective_from").notNull(), // ISO date
-});
+export const signatory = sqliteTable(
+  "signatory",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    barangayId: integer("barangay_id").notNull().references(() => barangay.id),
+    role: text("role").$type<SignatoryRole>().notNull(),
+    name: text("name").notNull(),
+    designation: text("designation").notNull(),
+    effectiveFrom: text("effective_from").notNull(), // ISO date
+  },
+  (t) => [
+    check("signatory_role_valid", sql`${t.role} IN ('prepared_by','certified_by','approved_by')`),
+    // A role can be held by different people over the years (D25), but two
+    // rows for the same barangay/role/date would be ambiguous about which
+    // one a report should use.
+    uniqueIndex("signatory_barangay_role_effective_uq").on(t.barangayId, t.role, t.effectiveFrom),
+  ],
+);
 
 /* ------------------------------------------------------------------ */
 /* Period control                                                      */

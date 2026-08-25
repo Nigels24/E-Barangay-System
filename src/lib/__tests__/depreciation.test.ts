@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { annualDepreciationCentavos, monthlyDepreciationCentavos } from "../depreciation";
+import {
+  accumulatedDepreciationCentavos,
+  annualDepreciationCentavos,
+  monthlyDepreciationCentavos,
+  monthsDepreciated,
+} from "../depreciation";
 import { toCentavos } from "../money";
 
 describe("annualDepreciationCentavos", () => {
@@ -77,5 +82,55 @@ describe("monthlyDepreciationCentavos", () => {
     const annual = annualDepreciationCentavos(toCentavos(87784.51), 10);
     const monthly = monthlyDepreciationCentavos(toCentavos(87784.51), 10);
     expect(Math.abs(monthly * 12 - annual)).toBeLessThanOrEqual(12);
+  });
+});
+
+describe("monthsDepreciated — COA's 15th-day rule", () => {
+  it("acquired on the 15th or earlier: the acquisition month itself counts", () => {
+    expect(monthsDepreciated("2024-01-15", "2024-01-31", 10)).toBe(1);
+    expect(monthsDepreciated("2024-01-01", "2024-01-31", 10)).toBe(1);
+  });
+
+  it("acquired after the 15th: the acquisition month does not count", () => {
+    expect(monthsDepreciated("2024-01-16", "2024-01-31", 10)).toBe(0);
+    expect(monthsDepreciated("2024-01-16", "2024-02-29", 10)).toBe(1);
+  });
+
+  it("counts whole months across a year boundary", () => {
+    // Acquired 2023-12-10 (counts December); as of 2024-02-29 is Dec, Jan, Feb = 3.
+    expect(monthsDepreciated("2023-12-10", "2024-02-29", 10)).toBe(3);
+  });
+
+  it("late-in-month acquisition rolling the start into the next year", () => {
+    // Acquired 2023-12-20 -> starts January 2024; as of 2024-01-31 is 1 month.
+    expect(monthsDepreciated("2023-12-20", "2024-01-31", 10)).toBe(1);
+  });
+
+  it("is zero before depreciation has started, never negative", () => {
+    expect(monthsDepreciated("2024-06-20", "2024-06-30", 10)).toBe(0);
+  });
+
+  it("caps at the asset's full useful life in months", () => {
+    expect(monthsDepreciated("2000-01-01", "2024-01-31", 10)).toBe(120);
+  });
+});
+
+describe("accumulatedDepreciationCentavos", () => {
+  it("is monthly depreciation times months elapsed", () => {
+    const cost = toCentavos(35000);
+    const monthly = monthlyDepreciationCentavos(cost, 7);
+    expect(accumulatedDepreciationCentavos(cost, 7, 0.1, 5)).toBe(monthly * 5);
+  });
+
+  it("never exceeds the depreciable base, even after the full useful life", () => {
+    const cost = toCentavos(35000);
+    const cap = Math.round(cost * 0.9);
+    expect(accumulatedDepreciationCentavos(cost, 7, 0.1, 7 * 12)).toBe(cap);
+    // Requesting more months than the useful life still doesn't overshoot.
+    expect(accumulatedDepreciationCentavos(cost, 7, 0.1, 999)).toBe(cap);
+  });
+
+  it("zero months elapsed is zero accumulated depreciation", () => {
+    expect(accumulatedDepreciationCentavos(toCentavos(35000), 7, 0.1, 0)).toBe(0);
   });
 });

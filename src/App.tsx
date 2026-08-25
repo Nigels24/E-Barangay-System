@@ -3,9 +3,14 @@ import { AppShell } from "./components/AppShell";
 import { Card } from "./components/Card";
 import { errorMessage } from "./lib/errorMessage";
 import type { EngineDb } from "./lib/engine/types";
+import { Advances } from "./screens/Advances";
+import { BankReconciliation } from "./screens/BankReconciliation";
+import { ChartOfAccountsAdmin } from "./screens/ChartOfAccountsAdmin";
+import { FixedAssets } from "./screens/FixedAssets";
 import { JournalVoucher } from "./screens/JournalVoucher";
-import { Reports } from "./screens/Reports";
+import { Reports, type ReportsView } from "./screens/Reports";
 import { SelectRecords, type OpenedBooks } from "./screens/SelectRecords";
+import { Signatories } from "./screens/Signatories";
 import "./App.css";
 
 type Bootstrap =
@@ -14,15 +19,26 @@ type Bootstrap =
   | { status: "failed"; message: string };
 
 /**
- * The app's screen transitions. No router: there are three screens, and
- * `App` already owns the bootstrap state beside it. Reports carries `from`
- * so its Back returns to wherever it was opened from — the picker, or a
- * voucher in progress — rather than always landing on the picker.
+ * The app's screen transitions. No router: there are a handful of screens,
+ * and `App` already owns the bootstrap state beside it. Reports carries
+ * `from` so its Back returns to wherever it was opened from — the picker, a
+ * voucher in progress, or the fixed-asset register — rather than always
+ * landing on the picker.
  */
 type Screen =
   | { name: "select" }
   | ({ name: "journal" } & OpenedBooks)
-  | ({ name: "reports"; from: "select" | "journal" } & OpenedBooks);
+  | ({ name: "fixedAssets" } & OpenedBooks)
+  | ({ name: "advances" } & OpenedBooks)
+  | ({ name: "bankReconciliation" } & OpenedBooks)
+  | ({ name: "signatories" } & OpenedBooks)
+  /** Not barangay-scoped (D9 — one chart shared by all 54 barangays), unlike every other register. */
+  | { name: "chartOfAccounts" }
+  | ({
+      name: "reports";
+      from: "select" | "journal" | "fixedAssets" | "advances" | "bankReconciliation";
+      initialView?: ReportsView;
+    } & OpenedBooks);
 
 /**
  * The app, and the one place the database bootstrap becomes visible.
@@ -59,7 +75,16 @@ function App({ db }: { db: Promise<EngineDb> }) {
 
   return (
     <AppShell
-      wide={bootstrap.status === "ready" && (screen.name === "journal" || screen.name === "reports")}
+      wide={
+        bootstrap.status === "ready" &&
+        (screen.name === "journal" ||
+          screen.name === "fixedAssets" ||
+          screen.name === "advances" ||
+          screen.name === "bankReconciliation" ||
+          screen.name === "signatories" ||
+          screen.name === "chartOfAccounts" ||
+          screen.name === "reports")
+      }
     >
       {bootstrap.status === "loading" ? (
         <Card title="Opening the books…" subtitle="Preparing the database on this computer." />
@@ -82,6 +107,11 @@ function App({ db }: { db: Promise<EngineDb> }) {
             db={bootstrap.db}
             onOpenBooks={(opened) => setScreen({ name: "journal", ...opened })}
             onViewReports={(opened) => setScreen({ name: "reports", from: "select", ...opened })}
+            onOpenFixedAssets={(opened) => setScreen({ name: "fixedAssets", ...opened })}
+            onOpenAdvances={(opened) => setScreen({ name: "advances", ...opened })}
+            onOpenBankReconciliation={(opened) => setScreen({ name: "bankReconciliation", ...opened })}
+            onOpenSignatories={(opened) => setScreen({ name: "signatories", ...opened })}
+            onOpenChartOfAccounts={() => setScreen({ name: "chartOfAccounts" })}
           />
         ) : screen.name === "journal" ? (
           <JournalVoucher
@@ -105,7 +135,84 @@ function App({ db }: { db: Promise<EngineDb> }) {
                 status: screen.status,
               })
             }
+            onOpenFixedAssets={() => setScreen({ ...screen, name: "fixedAssets" })}
+            onOpenAdvances={() => setScreen({ ...screen, name: "advances" })}
+            onOpenBankReconciliation={() => setScreen({ ...screen, name: "bankReconciliation" })}
+            onOpenSignatories={() => setScreen({ ...screen, name: "signatories" })}
+            onOpenChartOfAccounts={() => setScreen({ name: "chartOfAccounts" })}
           />
+        ) : screen.name === "fixedAssets" ? (
+          <FixedAssets
+            db={bootstrap.db}
+            barangayId={screen.barangayId}
+            barangayName={screen.barangayName}
+            onBack={() => setScreen({ name: "select" })}
+            onViewSchedule={() =>
+              setScreen({
+                name: "reports",
+                from: "fixedAssets",
+                initialView: "assets",
+                barangayId: screen.barangayId,
+                barangayName: screen.barangayName,
+                periodId: screen.periodId,
+                year: screen.year,
+                month: screen.month,
+                status: screen.status,
+              })
+            }
+          />
+        ) : screen.name === "advances" ? (
+          <Advances
+            db={bootstrap.db}
+            barangayId={screen.barangayId}
+            barangayName={screen.barangayName}
+            onBack={() => setScreen({ name: "select" })}
+            onViewSchedule={() =>
+              setScreen({
+                name: "reports",
+                from: "advances",
+                initialView: "advances",
+                barangayId: screen.barangayId,
+                barangayName: screen.barangayName,
+                periodId: screen.periodId,
+                year: screen.year,
+                month: screen.month,
+                status: screen.status,
+              })
+            }
+          />
+        ) : screen.name === "bankReconciliation" ? (
+          <BankReconciliation
+            db={bootstrap.db}
+            barangayId={screen.barangayId}
+            barangayName={screen.barangayName}
+            periodId={screen.periodId}
+            year={screen.year}
+            month={screen.month}
+            onBack={() => setScreen({ name: "select" })}
+            onViewStatement={() =>
+              setScreen({
+                name: "reports",
+                from: "bankReconciliation",
+                initialView: "bankrec",
+                barangayId: screen.barangayId,
+                barangayName: screen.barangayName,
+                periodId: screen.periodId,
+                year: screen.year,
+                month: screen.month,
+                status: screen.status,
+              })
+            }
+          />
+        ) : screen.name === "signatories" ? (
+          <Signatories
+            db={bootstrap.db}
+            barangayId={screen.barangayId}
+            barangayName={screen.barangayName}
+            onBack={() => setScreen({ name: "select" })}
+          />
+        ) : screen.name === "chartOfAccounts" ? (
+          <ChartOfAccountsAdmin db={bootstrap.db} onBack={() => setScreen({ name: "select" })} />
         ) : (
           <Reports
             db={bootstrap.db}
@@ -113,6 +220,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
             barangayName={screen.barangayName}
             year={screen.year}
             month={screen.month}
+            initialView={screen.initialView}
             onBack={() =>
               screen.from === "journal"
                 ? setScreen({
@@ -124,7 +232,37 @@ function App({ db }: { db: Promise<EngineDb> }) {
                     month: screen.month,
                     status: screen.status,
                   })
-                : setScreen({ name: "select" })
+                : screen.from === "fixedAssets"
+                  ? setScreen({
+                      name: "fixedAssets",
+                      barangayId: screen.barangayId,
+                      barangayName: screen.barangayName,
+                      periodId: screen.periodId,
+                      year: screen.year,
+                      month: screen.month,
+                      status: screen.status,
+                    })
+                  : screen.from === "advances"
+                    ? setScreen({
+                        name: "advances",
+                        barangayId: screen.barangayId,
+                        barangayName: screen.barangayName,
+                        periodId: screen.periodId,
+                        year: screen.year,
+                        month: screen.month,
+                        status: screen.status,
+                      })
+                    : screen.from === "bankReconciliation"
+                      ? setScreen({
+                          name: "bankReconciliation",
+                          barangayId: screen.barangayId,
+                          barangayName: screen.barangayName,
+                          periodId: screen.periodId,
+                          year: screen.year,
+                          month: screen.month,
+                          status: screen.status,
+                        })
+                      : setScreen({ name: "select" })
             }
           />
         )

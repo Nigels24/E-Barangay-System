@@ -1,0 +1,130 @@
+/**
+ * The signatory register screen. `.field-row` / `.field` / `.badges` are
+ * reused from `Select.css` / `Badge.css`; everything below is mirrored from
+ * `Advances.css`'s equivalents on the same tokens — each screen owns its
+ * own layout classes rather than importing another screen's, the precedent
+ * `.form-error` already set across the other screens.
+ */
+
+.sig-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  padding: var(--space-2) var(--space-2-5);
+  border-radius: var(--radius-sm);
+}
+
+.back-link:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* ---- Add-signatory form ---- */
+
+.sig-actions {
+  margin-top: var(--space-4);
+}
+
+.sig-problems {
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-5);
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+.sig-problems li {
+  margin-bottom: var(--space-1);
+}
+
+.form-error {
+  font-size: 13px;
+  color: var(--danger);
+  background: var(--danger-tint);
+  border-radius: var(--radius-md);
+  padding: var(--space-2-5) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.form-success {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-tint);
+  border-radius: var(--radius-md);
+  padding: var(--space-2-5) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+/* ---- Register table ---- */
+
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.table-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table-card thead tr {
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.table-card th {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+}
+
+.table-card th:first-child {
+  padding-left: var(--space-5);
+}
+
+.table-card td {
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.table-card td:first-child {
+  padding-left: var(--space-5);
+}
+
+.table-card tbody tr:hover {
+  background: var(--surface-subtle);
+}
+
+.table-card .empty-row {
+  text-align: center;
+  padding: var(--space-8) 0;
+  color: var(--faint);
+}

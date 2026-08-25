@@ -49,10 +49,20 @@ export function SelectRecords({
   db,
   onOpenBooks,
   onViewReports,
+  onOpenFixedAssets,
+  onOpenAdvances,
+  onOpenBankReconciliation,
+  onOpenSignatories,
+  onOpenChartOfAccounts,
 }: {
   db: EngineDb;
   onOpenBooks: (opened: OpenedBooks) => void;
   onViewReports: (opened: OpenedBooks) => void;
+  onOpenFixedAssets: (opened: OpenedBooks) => void;
+  onOpenAdvances: (opened: OpenedBooks) => void;
+  onOpenBankReconciliation: (opened: OpenedBooks) => void;
+  onOpenSignatories: (opened: OpenedBooks) => void;
+  onOpenChartOfAccounts: () => void;
 }) {
   const [barangays, setBarangays] = useState<BarangayOption[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -192,6 +202,12 @@ export function SelectRecords({
 
   return (
     <>
+      <div className="select-header">
+        <Button variant="ghost" size="sm" onClick={onOpenChartOfAccounts}>
+          Chart of accounts
+        </Button>
+      </div>
+
       <Card title="Select records" subtitle="Choose a barangay, year and month to open its books.">
         <div className="field-row">
           <Select
@@ -263,6 +279,18 @@ export function SelectRecords({
             <div className="period-summary-actions">
               <Button variant="ghost" onClick={() => opened && onViewReports(opened)}>
                 View reports
+              </Button>
+              <Button variant="ghost" onClick={() => opened && onOpenFixedAssets(opened)}>
+                Fixed assets
+              </Button>
+              <Button variant="ghost" onClick={() => opened && onOpenAdvances(opened)}>
+                Advances
+              </Button>
+              <Button variant="ghost" onClick={() => opened && onOpenBankReconciliation(opened)}>
+                Bank reconciliation
+              </Button>
+              <Button variant="ghost" onClick={() => opened && onOpenSignatories(opened)}>
+                Signatories
               </Button>
               {summary.status === "open" ? (
                 closeConfirming ? (

@@ -36,3 +36,41 @@ export function monthlyDepreciationCentavos(
 ): number {
   return Math.round(annualDepreciationCentavos(costCentavos, usefulLifeYears, residualRate) / 12);
 }
+
+/**
+ * Whole months of depreciation elapsed from `acquisitionDate` through
+ * `asOfDate`, per COA's own PPE Manual "15th-day rule": a month counts once
+ * the asset is available for use on or before the 15th of that month;
+ * acquired after the 15th, depreciation starts the following month instead.
+ * Never negative (an asOfDate before the asset's depreciation even starts is
+ * zero months, not a negative one), and never more than the asset's full
+ * useful life — depreciation never continues past it.
+ */
+export function monthsDepreciated(acquisitionDate: string, asOfDate: string, usefulLifeYears: number): number {
+  const [acqYear, acqMonth, acqDay] = acquisitionDate.split("-").map(Number);
+  const [asOfYear, asOfMonth] = asOfDate.split("-").map(Number);
+
+  const startMonthRaw = acqDay <= 15 ? acqMonth : acqMonth + 1;
+  const startYear = startMonthRaw > 12 ? acqYear + 1 : acqYear;
+  const startMonth = startMonthRaw > 12 ? startMonthRaw - 12 : startMonthRaw;
+
+  const elapsed = (asOfYear - startYear) * 12 + (asOfMonth - startMonth) + 1;
+  return Math.min(Math.max(elapsed, 0), usefulLifeYears * 12);
+}
+
+/**
+ * Accumulated depreciation as of a date — monthly depreciation times the
+ * number of months elapsed (per {@link monthsDepreciated}), capped at the
+ * asset's full depreciable base so rounding across many months can never
+ * push accumulated depreciation past cost * (1 - residualRate).
+ */
+export function accumulatedDepreciationCentavos(
+  costCentavos: number,
+  usefulLifeYears: number,
+  residualRate: number,
+  monthsElapsed: number,
+): number {
+  const monthly = monthlyDepreciationCentavos(costCentavos, usefulLifeYears, residualRate);
+  const depreciableBaseCentavos = Math.round(costCentavos * (1 - residualRate));
+  return Math.min(monthly * monthsElapsed, depreciableBaseCentavos);
+}

@@ -137,3 +137,46 @@ export function BarChartIcon({ size = 16 }: { size?: number }) {
     </Glyph>
   );
 }
+
+/** Physical property — the fixed-asset register nav entry. */
+export function BoxIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <path d="M21 8 12 3 3 8l9 5 9-5Z" />
+      <path d="M3 8v8l9 5 9-5V8" />
+      <path d="M12 13v8" />
+    </Glyph>
+  );
+}
+
+/** A bank building — the bank reconciliation nav entry. */
+export function BankIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <path d="M3 10h18" />
+      <path d="M12 2 3 8h18Z" />
+      <path d="M5 10v9M10 10v9M14 10v9M19 10v9" />
+      <path d="M3 21h18" />
+    </Glyph>
+  );
+}
+
+/** A pen, signing — the signatory register nav entry. */
+export function SignatureIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <path d="M3 17.25V21h3.75L18.81 8.94a1.5 1.5 0 0 0 0-2.12l-1.63-1.63a1.5 1.5 0 0 0-2.12 0L3 17.25Z" />
+      <path d="M13.5 6.5l3 3" />
+    </Glyph>
+  );
+}
+
+/** A list of coded rows — the chart-of-accounts admin nav entry. */
+export function ListIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Glyph size={size}>
+      <path d="M8 6h13M8 12h13M8 18h13" />
+      <path d="M3 6h.01M3 12h.01M3 18h.01" />
+    </Glyph>
+  );
+}

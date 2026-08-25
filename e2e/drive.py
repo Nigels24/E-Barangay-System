@@ -244,6 +244,30 @@ def main():
     time.sleep(2.5)
     check("says so plainly", "No posted activity" in screen_text())
 
+    print("\nGeneral Journal — the fixture's only posted entries are CRJ/CkDJ, not GJ, so this must say so plainly rather than show a blank table")
+    click("General Journal")
+    time.sleep(1.5)
+    gj = screen_text()
+    check("hint states the period and book", "January 2026" in gj and "General Journal book (GJ)" in gj)
+    check("empty state, not a blank table", "No posted General Journal (GJ) activity" in gj)
+    check("signature block still renders", "Prepared by" in gj and "Certified by" in gj)
+
+    print("\nSchedule of Advances — the fixture has no advances recorded, so this must say so plainly rather than show a blank table")
+    click("Schedule of Advances")
+    time.sleep(1.5)
+    soa = screen_text()
+    check("hint states the as-of date", "As of January 31, 2026" in soa)
+    check("empty state, not a blank table", "No advances outstanding" in soa)
+    check("signature block still renders", "Prepared by" in soa and "Certified by" in soa)
+
+    print("\nBank Reconciliation — the fixture has no bank accounts on file, so this must say so plainly rather than show a blank table")
+    click("Bank Reconciliation")
+    time.sleep(1.5)
+    br = screen_text()
+    check("hint states the as-of date", "As of January 31, 2026" in br)
+    check("empty state, not a blank table", "No bank accounts on file" in br)
+    check("signature block still renders", "Prepared by" in br and "Certified by" in br)
+
     print("\nThe voucher screen's own way in, and back out again")
     click("Back")
     time.sleep(1.5)
@@ -259,20 +283,25 @@ def main():
     check("back returns to the voucher, not the picker", "New voucher" in screen_text())
 
     print("\nThe app's own chrome must not print")
-    rule = js(
+    # Concatenates EVERY @media print block across every stylesheet, not just
+    # the first one found — T-015 added several (AppShell.css, index.css,
+    # Reports.css), and an early return here would silently only ever check
+    # whichever one happens to load first.
+    rules = js(
         """
+        let all = '';
         for (const sheet of document.styleSheets) {
           let rules; try { rules = sheet.cssRules } catch (e) { continue }
           for (const r of rules) {
             if (r.type === CSSRule.MEDIA_RULE && r.conditionText.includes('print')) {
-              return r.cssText.replace(/\\s+/g, ' ');
+              all += r.cssText.replace(/\\s+/g, ' ') + ' ';
             }
           }
         }
-        return '';
+        return all;
         """
     )
-    check("@media print hides the topbar", "topbar" in rule and "none" in rule)
+    check("@media print hides the topbar", "topbar" in rules and "none" in rules)
 
     print()
     if failures:
