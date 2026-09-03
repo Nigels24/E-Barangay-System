@@ -1,36 +1,90 @@
 import { describe, it, expect } from "vitest";
 import { createTestDb } from "../../../db/testDb";
-import { appUser } from "../../../db/schema";
-import { runSeed } from "../../../db/seed";
-import { PLACEHOLDER_USER_USERNAME } from "../../../db/seed/users";
-import { MissingPostingUserError, requirePostingUserId } from "../users";
+import { seedPlaceholderUser } from "../../../db/seed/users";
+import {
+  createFirstUserAction,
+  createUserAction,
+  listActiveUsers,
+  listAllUsers,
+  setUserActiveAction,
+} from "../users";
 
-describe("requirePostingUserId", () => {
-  it("resolves the placeholder user the seed installs", async () => {
+describe("createFirstUserAction", () => {
+  it("creates the first user as an Administrator regardless of what else is on the form", async () => {
     const db = createTestDb();
-    await runSeed(db);
+    const first = await createFirstUserAction(db, { username: "jdelacruz", fullName: "Juan Dela Cruz" });
+    expect(first.role).toBe("admin");
+    expect(first.isActive).toBe(true);
+  });
+});
 
-    const id = await requirePostingUserId(db);
-    const row = await db.query.select().from(appUser).all();
-    expect(id).toBe(row.find((r) => r.username === PLACEHOLDER_USER_USERNAME)?.id);
+describe("listActiveUsers / listAllUsers", () => {
+  it("offers only active users to the who's-working picker", async () => {
+    const db = createTestDb();
+    const admin = await createFirstUserAction(db, { username: "admin1", fullName: "Admin One" });
+    const bookkeeper = await createUserAction(
+      db,
+      { username: "bookkeeper1", fullName: "Maria Santos", role: "bookkeeper" },
+      admin.id,
+    );
+    await setUserActiveAction(db, { userId: bookkeeper.id, isActive: false }, admin.id);
+
+    const active = await listActiveUsers(db);
+    expect(active.map((u) => u.username)).toEqual(["admin1"]);
   });
 
-  it("finds it by username, not by assuming it is row 1", async () => {
+  it("lists everyone, active or not, for the admin screen", async () => {
     const db = createTestDb();
-    // A database that already held a real user before this seed existed.
-    await db.query
-      .insert(appUser)
-      .values({ username: "ecmanosur", passwordHash: "argon2$real", fullName: "Eugenie Manosur", role: "admin" })
-      .run();
-    await runSeed(db);
+    const admin = await createFirstUserAction(db, { username: "admin1", fullName: "Admin One" });
+    const bookkeeper = await createUserAction(
+      db,
+      { username: "bookkeeper1", fullName: "Maria Santos", role: "bookkeeper" },
+      admin.id,
+    );
+    await setUserActiveAction(db, { userId: bookkeeper.id, isActive: false }, admin.id);
 
-    const id = await requirePostingUserId(db);
-    expect(id).not.toBe(1);
+    const all = await listAllUsers(db);
+    expect(all.map((u) => u.username).sort()).toEqual(["admin1", "bookkeeper1"]);
   });
 
-  it("refuses with an actionable message when there is nobody to post as", async () => {
+  it("never offers the historical D32 placeholder actor, even if one exists in the database", async () => {
     const db = createTestDb();
-    await expect(requirePostingUserId(db)).rejects.toThrow(MissingPostingUserError);
-    await expect(requirePostingUserId(db)).rejects.toThrow(/nothing can be posted/);
+    await seedPlaceholderUser(db);
+    await createFirstUserAction(db, { username: "jdelacruz", fullName: "Juan Dela Cruz" });
+
+    const active = await listActiveUsers(db);
+    const all = await listAllUsers(db);
+    expect(active.map((u) => u.username)).not.toContain("placeholder-bookkeeper");
+    expect(all.map((u) => u.username)).not.toContain("placeholder-bookkeeper");
+  });
+});
+
+describe("createUserAction / setUserActiveAction", () => {
+  it("adds a user attributed to the current session's actor", async () => {
+    const db = createTestDb();
+    const admin = await createFirstUserAction(db, { username: "admin1", fullName: "Admin One" });
+    const created = await createUserAction(
+      db,
+      { username: "reviewer1", fullName: "Pedro Reyes", role: "reviewer", position: "Reviewer" },
+      admin.id,
+    );
+    expect(created.role).toBe("reviewer");
+    expect(created.position).toBe("Reviewer");
+  });
+
+  it("deactivates and reactivates a user", async () => {
+    const db = createTestDb();
+    const admin = await createFirstUserAction(db, { username: "admin1", fullName: "Admin One" });
+    const bookkeeper = await createUserAction(
+      db,
+      { username: "bookkeeper1", fullName: "Maria Santos", role: "bookkeeper" },
+      admin.id,
+    );
+
+    const deactivated = await setUserActiveAction(db, { userId: bookkeeper.id, isActive: false }, admin.id);
+    expect(deactivated.isActive).toBe(false);
+
+    const reactivated = await setUserActiveAction(db, { userId: bookkeeper.id, isActive: true }, admin.id);
+    expect(reactivated.isActive).toBe(true);
   });
 });

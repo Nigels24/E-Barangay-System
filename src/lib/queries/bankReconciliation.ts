@@ -41,7 +41,6 @@ import type { EngineDb } from "../engine/types";
 import { buildGeneralLedger } from "../reports/generalLedger";
 import { sumCentavos } from "../money";
 import { postNewVoucher, type PostedVoucher } from "./journal";
-import { requirePostingUserId } from "./users";
 
 /* ------------------------------------------------------------------ */
 /* Bank accounts                                                        */
@@ -104,10 +103,13 @@ export interface NewBankAccountInput {
   glAccountId: number;
 }
 
-/** Adds a bank account. The actor is resolved here (D32), same as every other write in the app. */
-export async function createBankAccountAction(db: EngineDb, input: NewBankAccountInput): Promise<BankAccountRecord> {
-  const userId = await requirePostingUserId(db);
-  const created = await createBankAccount(db, { ...input, recordedBy: userId });
+/** Adds a bank account. `actorUserId` is the current session's user (T-018/D24). */
+export async function createBankAccountAction(
+  db: EngineDb,
+  input: NewBankAccountInput,
+  actorUserId: number,
+): Promise<BankAccountRecord> {
+  const created = await createBankAccount(db, { ...input, recordedBy: actorUserId });
   const row = await db.query
     .select(bankAccountSelection)
     .from(bankAccount)
@@ -241,12 +243,12 @@ export interface StartReconciliationActionInput {
   statementBalanceCentavos: number;
 }
 
-/** Starts this period's reconciliation. The actor is resolved here (D32). */
+/** Starts this period's reconciliation. `actorUserId` is the current session's user (T-018/D24). */
 export async function startReconciliationAction(
   db: EngineDb,
   input: StartReconciliationActionInput,
+  actorUserId: number,
 ): Promise<ReconciliationWorksheet> {
-  const userId = await requirePostingUserId(db);
   const ledger = await buildGeneralLedger(
     db,
     input.context.barangayId,
@@ -260,7 +262,7 @@ export async function startReconciliationAction(
     statementDate: input.statementDate,
     statementBalanceCentavos: input.statementBalanceCentavos,
     bookBalanceCentavos: ledger.closingBalanceCentavos,
-    preparedBy: userId,
+    preparedBy: actorUserId,
   });
   return reloadWorksheet(db, input.context);
 }
@@ -272,17 +274,17 @@ export interface UpdateReconciliationHeaderActionInput {
   statementBalanceCentavos: number;
 }
 
-/** Corrects the statement date/balance while still a draft (D3). The actor is resolved here (D32). */
+/** Corrects the statement date/balance while still a draft (D3). `actorUserId` is the current session's user (T-018/D24). */
 export async function updateReconciliationHeaderAction(
   db: EngineDb,
   input: UpdateReconciliationHeaderActionInput,
+  actorUserId: number,
 ): Promise<ReconciliationWorksheet> {
-  const userId = await requirePostingUserId(db);
   await updateReconciliationHeader(db, {
     reconciliationId: input.reconciliationId,
     statementDate: input.statementDate,
     statementBalanceCentavos: input.statementBalanceCentavos,
-    updatedBy: userId,
+    updatedBy: actorUserId,
   });
   return reloadWorksheet(db, input.context);
 }
@@ -297,12 +299,12 @@ export interface AddReconcilingItemActionInput {
   relatedEntryId?: number;
 }
 
-/** Adds a reconciling item (D4). The actor is resolved here (D32). */
+/** Adds a reconciling item (D4). `actorUserId` is the current session's user (T-018/D24). */
 export async function addReconcilingItemAction(
   db: EngineDb,
   input: AddReconcilingItemActionInput,
+  actorUserId: number,
 ): Promise<ReconciliationWorksheet> {
-  const userId = await requirePostingUserId(db);
   await addReconcilingItem(db, {
     reconciliationId: input.reconciliationId,
     side: input.side,
@@ -310,7 +312,7 @@ export async function addReconcilingItemAction(
     amountCentavos: input.amountCentavos,
     explanation: input.explanation,
     relatedEntryId: input.relatedEntryId,
-    recordedBy: userId,
+    recordedBy: actorUserId,
   });
   return reloadWorksheet(db, input.context);
 }
@@ -329,15 +331,15 @@ export interface FinalizeReconciliationActionInput {
 export async function finalizeReconciliationAction(
   db: EngineDb,
   input: FinalizeReconciliationActionInput,
+  actorUserId: number,
 ): Promise<ReconciliationWorksheet> {
-  const userId = await requirePostingUserId(db);
   const worksheet = await reloadWorksheet(db, input.context);
   await finalizeReconciliation(db, {
     reconciliationId: input.reconciliationId,
     currentBookBalanceCentavos: worksheet.liveBookBalanceCentavos,
     varianceCentavos: worksheet.varianceCentavos,
     varianceOverrideReason: input.varianceOverrideReason,
-    finalizedBy: userId,
+    finalizedBy: actorUserId,
   });
   return reloadWorksheet(db, input.context);
 }
@@ -422,10 +424,9 @@ export interface MarkCheckClearedActionInput {
   clearedDate: string;
 }
 
-/** Marks a check cleared, once it appears on a bank statement (D6). The actor is resolved here (D32). */
-export async function markCheckClearedAction(db: EngineDb, input: MarkCheckClearedActionInput) {
-  const userId = await requirePostingUserId(db);
-  return markCheckCleared(db, { entryId: input.entryId, clearedDate: input.clearedDate, clearedBy: userId });
+/** Marks a check cleared, once it appears on a bank statement (D6). `actorUserId` is the current session's user (T-018/D24). */
+export async function markCheckClearedAction(db: EngineDb, input: MarkCheckClearedActionInput, actorUserId: number) {
+  return markCheckCleared(db, { entryId: input.entryId, clearedDate: input.clearedDate, clearedBy: actorUserId });
 }
 
 /* ------------------------------------------------------------------ */
@@ -457,25 +458,33 @@ export interface PostAdjustingEntryActionInput {
 export async function postAdjustingEntryAction(
   db: EngineDb,
   input: PostAdjustingEntryActionInput,
+  actorUserId: number,
 ): Promise<{ worksheet: ReconciliationWorksheet; posted: PostedVoucher }> {
   const magnitude = Math.abs(input.itemAmountCentavos);
   const cashSide = input.itemAmountCentavos > 0 ? "debit" : "credit";
   const offsetSide = cashSide === "debit" ? "credit" : "debit";
 
-  const posted = await postNewVoucher(db, {
-    barangayId: input.context.barangayId,
-    periodId: input.context.periodId,
-    entryDate: input.entryDate,
-    book: "GJ",
-    particulars: input.particulars,
-    lines: [
-      { accountId: input.context.glAccountId, side: cashSide, amountCentavos: magnitude },
-      { accountId: input.offsetAccountId, side: offsetSide, amountCentavos: magnitude },
-    ],
-  });
+  const posted = await postNewVoucher(
+    db,
+    {
+      barangayId: input.context.barangayId,
+      periodId: input.context.periodId,
+      entryDate: input.entryDate,
+      book: "GJ",
+      particulars: input.particulars,
+      lines: [
+        { accountId: input.context.glAccountId, side: cashSide, amountCentavos: magnitude },
+        { accountId: input.offsetAccountId, side: offsetSide, amountCentavos: magnitude },
+      ],
+    },
+    actorUserId,
+  );
 
-  const userId = await requirePostingUserId(db);
-  await linkAdjustingEntry(db, { reconcilingItemId: input.reconcilingItemId, entryId: posted.entryId, linkedBy: userId });
+  await linkAdjustingEntry(db, {
+    reconcilingItemId: input.reconcilingItemId,
+    entryId: posted.entryId,
+    linkedBy: actorUserId,
+  });
 
   return { worksheet: await reloadWorksheet(db, input.context), posted };
 }

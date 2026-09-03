@@ -3,20 +3,41 @@ import { AppShell } from "./components/AppShell";
 import { Card } from "./components/Card";
 import { errorMessage } from "./lib/errorMessage";
 import type { EngineDb } from "./lib/engine/types";
+import { listActiveUsers, type UserRecord } from "./lib/queries/users";
 import { Advances } from "./screens/Advances";
 import { BankReconciliation } from "./screens/BankReconciliation";
 import { ChartOfAccountsAdmin } from "./screens/ChartOfAccountsAdmin";
+import { FirstRunSetup } from "./screens/FirstRunSetup";
 import { FixedAssets } from "./screens/FixedAssets";
 import { JournalVoucher } from "./screens/JournalVoucher";
 import { Reports, type ReportsView } from "./screens/Reports";
 import { SelectRecords, type OpenedBooks } from "./screens/SelectRecords";
 import { Signatories } from "./screens/Signatories";
+import { UserAdmin } from "./screens/UserAdmin";
+import { WhoIsWorking } from "./screens/WhoIsWorking";
 import "./App.css";
 
 type Bootstrap =
   | { status: "loading" }
   | { status: "ready"; db: EngineDb }
   | { status: "failed"; message: string };
+
+/**
+ * Login, in this app (D24/T-018): a name/role picker, not a password — see
+ * `db/schema.ts`'s comment on `app_user.passwordHash`. This is the state
+ * machine for it, driven off `listActiveUsers` once the database itself is
+ * ready: a database with no users yet goes to `firstRun`; otherwise the
+ * session starts at `picking` (or returns there via "Switch user") until a
+ * name is chosen. Every screen past that point is handed `session.user`'s
+ * id (and role, where a screen gates on it) as its own `currentUserId` /
+ * `currentUserRole` prop.
+ */
+type Session =
+  | { status: "loading" }
+  | { status: "failed"; message: string }
+  | { status: "firstRun" }
+  | { status: "picking" }
+  | { status: "active"; user: UserRecord };
 
 /**
  * The app's screen transitions. No router: there are a handful of screens,
@@ -34,6 +55,8 @@ type Screen =
   | ({ name: "signatories" } & OpenedBooks)
   /** Not barangay-scoped (D9 — one chart shared by all 54 barangays), unlike every other register. */
   | { name: "chartOfAccounts" }
+  /** Administrator-only (D24), reached the same way `chartOfAccounts` is — not barangay-scoped either. */
+  | { name: "userAdmin" }
   | ({
       name: "reports";
       from: "select" | "journal" | "fixedAssets" | "advances" | "bankReconciliation";
@@ -56,6 +79,7 @@ type Screen =
  */
 function App({ db }: { db: Promise<EngineDb> }) {
   const [bootstrap, setBootstrap] = useState<Bootstrap>({ status: "loading" });
+  const [session, setSession] = useState<Session>({ status: "loading" });
   const [screen, setScreen] = useState<Screen>({ name: "select" });
 
   useEffect(() => {
@@ -73,6 +97,27 @@ function App({ db }: { db: Promise<EngineDb> }) {
     };
   }, [db]);
 
+  useEffect(() => {
+    if (bootstrap.status !== "ready") return;
+    let cancelled = false;
+    listActiveUsers(bootstrap.db).then(
+      (users) => {
+        if (!cancelled) setSession(users.length === 0 ? { status: "firstRun" } : { status: "picking" });
+      },
+      (error: unknown) => {
+        if (!cancelled) setSession({ status: "failed", message: errorMessage(error) });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrap]);
+
+  function switchUser() {
+    setSession({ status: "picking" });
+    setScreen({ name: "select" });
+  }
+
   return (
     <AppShell
       wide={
@@ -83,8 +128,11 @@ function App({ db }: { db: Promise<EngineDb> }) {
           screen.name === "bankReconciliation" ||
           screen.name === "signatories" ||
           screen.name === "chartOfAccounts" ||
+          screen.name === "userAdmin" ||
           screen.name === "reports")
       }
+      currentUserName={session.status === "active" ? session.user.fullName : undefined}
+      onSwitchUser={session.status === "active" ? switchUser : undefined}
     >
       {bootstrap.status === "loading" ? (
         <Card title="Opening the books…" subtitle="Preparing the database on this computer." />
@@ -101,10 +149,31 @@ function App({ db }: { db: Promise<EngineDb> }) {
         </Card>
       ) : null}
 
-      {bootstrap.status === "ready" ? (
+      {bootstrap.status === "ready" && session.status === "loading" ? (
+        <Card title="Loading…" subtitle="Checking who's on file." />
+      ) : null}
+
+      {bootstrap.status === "ready" && session.status === "failed" ? (
+        <Card className="bootstrap-failure">
+          <h2>The list of users could not be read</h2>
+          <p className="bootstrap-failure-message">{session.message}</p>
+        </Card>
+      ) : null}
+
+      {bootstrap.status === "ready" && session.status === "firstRun" ? (
+        <FirstRunSetup db={bootstrap.db} onCreated={(user) => setSession({ status: "active", user })} />
+      ) : null}
+
+      {bootstrap.status === "ready" && session.status === "picking" ? (
+        <WhoIsWorking db={bootstrap.db} onSelect={(user) => setSession({ status: "active", user })} />
+      ) : null}
+
+      {bootstrap.status === "ready" && session.status === "active" ? (
         screen.name === "select" ? (
           <SelectRecords
             db={bootstrap.db}
+            currentUserId={session.user.id}
+            currentUserRole={session.user.role}
             onOpenBooks={(opened) => setScreen({ name: "journal", ...opened })}
             onViewReports={(opened) => setScreen({ name: "reports", from: "select", ...opened })}
             onOpenFixedAssets={(opened) => setScreen({ name: "fixedAssets", ...opened })}
@@ -112,6 +181,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
             onOpenBankReconciliation={(opened) => setScreen({ name: "bankReconciliation", ...opened })}
             onOpenSignatories={(opened) => setScreen({ name: "signatories", ...opened })}
             onOpenChartOfAccounts={() => setScreen({ name: "chartOfAccounts" })}
+            onOpenUserAdmin={() => setScreen({ name: "userAdmin" })}
           />
         ) : screen.name === "journal" ? (
           <JournalVoucher
@@ -122,6 +192,9 @@ function App({ db }: { db: Promise<EngineDb> }) {
             year={screen.year}
             month={screen.month}
             status={screen.status}
+            currentUserId={session.user.id}
+            currentUserRole={session.user.role}
+            onOpenUserAdmin={() => setScreen({ name: "userAdmin" })}
             onBack={() => setScreen({ name: "select" })}
             onViewReports={() =>
               setScreen({
@@ -146,6 +219,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
             db={bootstrap.db}
             barangayId={screen.barangayId}
             barangayName={screen.barangayName}
+            currentUserId={session.user.id}
             onBack={() => setScreen({ name: "select" })}
             onViewSchedule={() =>
               setScreen({
@@ -166,6 +240,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
             db={bootstrap.db}
             barangayId={screen.barangayId}
             barangayName={screen.barangayName}
+            currentUserId={session.user.id}
             onBack={() => setScreen({ name: "select" })}
             onViewSchedule={() =>
               setScreen({
@@ -189,6 +264,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
             periodId={screen.periodId}
             year={screen.year}
             month={screen.month}
+            currentUserId={session.user.id}
             onBack={() => setScreen({ name: "select" })}
             onViewStatement={() =>
               setScreen({
@@ -209,10 +285,13 @@ function App({ db }: { db: Promise<EngineDb> }) {
             db={bootstrap.db}
             barangayId={screen.barangayId}
             barangayName={screen.barangayName}
+            currentUserId={session.user.id}
             onBack={() => setScreen({ name: "select" })}
           />
         ) : screen.name === "chartOfAccounts" ? (
-          <ChartOfAccountsAdmin db={bootstrap.db} onBack={() => setScreen({ name: "select" })} />
+          <ChartOfAccountsAdmin db={bootstrap.db} currentUserId={session.user.id} onBack={() => setScreen({ name: "select" })} />
+        ) : screen.name === "userAdmin" ? (
+          <UserAdmin db={bootstrap.db} currentUserId={session.user.id} onBack={() => setScreen({ name: "select" })} />
         ) : (
           <Reports
             db={bootstrap.db}

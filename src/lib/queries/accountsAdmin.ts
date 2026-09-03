@@ -9,7 +9,6 @@ import { asc } from "drizzle-orm";
 import { account, type AccountType, type NormalBalance } from "../../db/schema";
 import { resolveProvisionalCode, setAccountActive } from "../engine/accountsAdmin";
 import type { EngineDb } from "../engine/types";
-import { requirePostingUserId } from "./users";
 
 export interface AdminAccountRecord {
   id: number;
@@ -32,13 +31,18 @@ export interface ResolveProvisionalCodeActionInput {
   newCode: string;
 }
 
-/** Confirms an account's real code (D12). The actor is resolved here (D32). */
+/**
+ * Confirms an account's real code (D12). `actorUserId` is the current
+ * session's user (T-018/D24) — restricted to Administrators at the screen
+ * level (`ChartOfAccountsAdmin.tsx` is only reachable as one), the same
+ * way every other "requires an admin" rule in this app is enforced today.
+ */
 export async function resolveProvisionalCodeAction(
   db: EngineDb,
   input: ResolveProvisionalCodeActionInput,
+  actorUserId: number,
 ): Promise<AdminAccountRecord> {
-  const userId = await requirePostingUserId(db);
-  return resolveProvisionalCode(db, { ...input, resolvedBy: userId });
+  return resolveProvisionalCode(db, { ...input, resolvedBy: actorUserId });
 }
 
 export interface SetAccountActiveActionInput {
@@ -46,11 +50,11 @@ export interface SetAccountActiveActionInput {
   isActive: boolean;
 }
 
-/** Activates or deactivates an account for the voucher dropdowns (D10). The actor is resolved here (D32). */
+/** Activates or deactivates an account for the voucher dropdowns (D10). `actorUserId` is the current session's user (T-018/D24), Administrator-only at the screen level. */
 export async function setAccountActiveAction(
   db: EngineDb,
   input: SetAccountActiveActionInput,
+  actorUserId: number,
 ): Promise<AdminAccountRecord> {
-  const userId = await requirePostingUserId(db);
-  return setAccountActive(db, { ...input, changedBy: userId });
+  return setAccountActive(db, { ...input, changedBy: actorUserId });
 }

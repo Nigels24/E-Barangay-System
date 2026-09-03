@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { seedEngineFixture } from "../../engine/__tests__/fixtures";
-import { seedPlaceholderUser, PLACEHOLDER_USER_USERNAME } from "../../../db/seed/users";
-import { appUser, auditLog, journalEntry, journalEntryLine } from "../../../db/schema";
+import { auditLog, journalEntry, journalEntryLine } from "../../../db/schema";
 import { closePeriod } from "../../engine/period";
 import { InvalidStatusError, ClosedPeriodError } from "../../engine/errors";
 import { createDraftEntry } from "../../engine/post";
@@ -16,13 +15,6 @@ import {
   voidPostedVoucher,
   type PeriodLineRow,
 } from "../journal";
-
-/** The engine fixture plus the placeholder user the real app posts as (D32). */
-async function fixture() {
-  const seeded = await seedEngineFixture();
-  await seedPlaceholderUser(seeded.db);
-  return seeded;
-}
 
 /** A balanced electric-bill voucher, the smallest realistic thing to post. */
 function electricBill(barangayId: number, periodId: number, accounts: { expense: number; cash: number }) {
@@ -41,13 +33,14 @@ function electricBill(barangayId: number, periodId: number, accounts: { expense:
 
 describe("postNewVoucher", () => {
   it("puts a balanced voucher into the books and gives it a YYYY-MM-NNN number", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const posted = await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
 
     expect(posted.jevNo).toBe("2024-01-001");
@@ -57,55 +50,64 @@ describe("postNewVoucher", () => {
   });
 
   it("numbers the second voucher of the month after the first (D13/D14)", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const input = electricBill(barangay.id, periods.jan2024.id, {
       expense: accounts.electricity.id,
       cash: accounts.cashInBank.id,
     });
-    expect((await postNewVoucher(db, input)).jevNo).toBe("2024-01-001");
-    expect((await postNewVoucher(db, input)).jevNo).toBe("2024-01-002");
+    expect((await postNewVoucher(db, input, user.id)).jevNo).toBe("2024-01-001");
+    expect((await postNewVoucher(db, input, user.id)).jevNo).toBe("2024-01-002");
   });
 
-  it("attributes the entry and its audit trail to the placeholder user (D32)", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+  it("attributes the entry and its audit trail to whoever posted it (T-018)", async () => {
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const posted = await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
 
     const row = await db.query.select().from(journalEntry).where(eq(journalEntry.id, posted.entryId)).get();
-    // Not the fixture's own "bookkeeper" — the seeded placeholder, resolved by
-    // the query layer rather than passed in by a screen.
-    expect(row?.createdBy).toBe(row?.postedBy);
-    expect(row?.createdBy).not.toBe(0);
+    // The actor passed in explicitly by the caller (T-018) — no more implicit
+    // placeholder resolution (D32, superseded).
+    expect(row?.createdBy).toBe(user.id);
+    expect(row?.postedBy).toBe(user.id);
   });
 
   it("stores check details on a CkDJ and stores nothing for blank ones elsewhere (D16)", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
-    const posted = await postNewVoucher(db, {
-      ...electricBill(barangay.id, periods.jan2024.id, {
-        expense: accounts.electricity.id,
-        cash: accounts.cashInBank.id,
-      }),
-      book: "CkDJ",
-      checkNo: " 3869301 ",
-      checkDate: "2024-01-31",
-    });
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
+    const posted = await postNewVoucher(
+      db,
+      {
+        ...electricBill(barangay.id, periods.jan2024.id, {
+          expense: accounts.electricity.id,
+          cash: accounts.cashInBank.id,
+        }),
+        book: "CkDJ",
+        checkNo: " 3869301 ",
+        checkDate: "2024-01-31",
+      },
+      user.id,
+    );
     const withCheck = await db.query.select().from(journalEntry).where(eq(journalEntry.id, posted.entryId)).get();
     expect(withCheck?.checkNo).toBe("3869301");
     expect(withCheck?.checkDate).toBe("2024-01-31");
 
-    const plain = await postNewVoucher(db, {
-      ...electricBill(barangay.id, periods.jan2024.id, {
-        expense: accounts.electricity.id,
-        cash: accounts.cashInBank.id,
-      }),
-      checkNo: "",
-      checkDate: "   ",
-    });
+    const plain = await postNewVoucher(
+      db,
+      {
+        ...electricBill(barangay.id, periods.jan2024.id, {
+          expense: accounts.electricity.id,
+          cash: accounts.cashInBank.id,
+        }),
+        checkNo: "",
+        checkDate: "   ",
+      },
+      user.id,
+    );
     const withoutCheck = await db.query.select().from(journalEntry).where(eq(journalEntry.id, plain.entryId)).get();
     // Blank strings, not nulls, would make an unwritten check look written.
     expect(withoutCheck?.checkNo).toBeNull();
@@ -113,7 +115,7 @@ describe("postNewVoucher", () => {
   });
 
   it("refuses a CkDJ with no check details, and leaves the draft visible", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const input = {
       ...electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
@@ -122,7 +124,7 @@ describe("postNewVoucher", () => {
       book: "CkDJ" as const,
     };
 
-    await expect(postNewVoucher(db, input)).rejects.toThrow(VoucherNotPostedError);
+    await expect(postNewVoucher(db, input, user.id)).rejects.toThrow(VoucherNotPostedError);
 
     const vouchers = await listPeriodVouchers(db, periods.jan2024.id);
     expect(vouchers).toHaveLength(1);
@@ -131,7 +133,7 @@ describe("postNewVoucher", () => {
   });
 
   it("names the surviving draft when posting fails after it was written", async () => {
-    const { db, barangay, admin, accounts, periods } = await fixture();
+    const { db, barangay, user, admin, accounts, periods } = await seedEngineFixture();
     await closePeriod(db, periods.jan2024.id, admin.id);
 
     // Nothing in the composer checks period status today (see REVIEW.md, T-006),
@@ -144,6 +146,7 @@ describe("postNewVoucher", () => {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     ).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(VoucherNotPostedError);
@@ -154,9 +157,11 @@ describe("postNewVoucher", () => {
     expect(draft?.status).toBe("draft");
   });
 
-  it("refuses when there is no user to post as", async () => {
-    // No placeholder user seeded — the state every real database was in before
-    // this task, in which a voucher could not be created at all.
+  it("refuses to post for an actor id that is not a real user (FK constraint)", async () => {
+    // T-018 removed the implicit placeholder-actor resolution this test used
+    // to exercise (D32, superseded) — `actorUserId` is now a required,
+    // explicit argument, so the only way "no real user" can still happen is
+    // a caller passing an id nothing in `app_user` actually has.
     const { db, barangay, accounts, periods } = await seedEngineFixture();
     await expect(
       postNewVoucher(
@@ -165,8 +170,9 @@ describe("postNewVoucher", () => {
           expense: accounts.electricity.id,
           cash: accounts.cashInBank.id,
         }),
+        999999,
       ),
-    ).rejects.toThrow(/no user/);
+    ).rejects.toThrow();
 
     // And nothing was written on the way to that refusal.
     expect(await db.query.select().from(journalEntry).all()).toHaveLength(0);
@@ -175,18 +181,19 @@ describe("postNewVoucher", () => {
 
 describe("listPeriodVouchers", () => {
   it("is empty for a period nothing has been filed under", async () => {
-    const { db, periods } = await fixture();
+    const { db, periods } = await seedEngineFixture();
     expect(await listPeriodVouchers(db, periods.jan2024.id)).toEqual([]);
   });
 
   it("returns a posted voucher with its lines, accounts and totals", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
 
     const [voucher] = await listPeriodVouchers(db, periods.jan2024.id);
@@ -207,13 +214,14 @@ describe("listPeriodVouchers", () => {
   });
 
   it("shows drafts alongside posted vouchers, so a half-made one is never invisible", async () => {
-    const { db, barangay, user, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
     await createDraftEntry(db, {
       barangayId: barangay.id,
@@ -234,13 +242,14 @@ describe("listPeriodVouchers", () => {
   });
 
   it("does not mix in another period's entries", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
     expect(await listPeriodVouchers(db, periods.feb2024.id)).toEqual([]);
   });
@@ -303,13 +312,14 @@ describe("groupLinesIntoVouchers", () => {
 
 describe("summarisePeriod", () => {
   it("counts posted money only, and counts drafts separately", async () => {
-    const { db, barangay, user, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
     await createDraftEntry(db, {
       barangayId: barangay.id,
@@ -344,7 +354,7 @@ describe("summarisePeriod", () => {
   });
 
   it("always shows posted debits equal to posted credits", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     for (let i = 0; i < 3; i++) {
       await postNewVoucher(
         db,
@@ -352,6 +362,7 @@ describe("summarisePeriod", () => {
           expense: accounts.electricity.id,
           cash: accounts.cashInBank.id,
         }),
+        user.id,
       );
     }
     const totals = summarisePeriod(await listPeriodVouchers(db, periods.jan2024.id));
@@ -361,64 +372,70 @@ describe("summarisePeriod", () => {
 });
 
 describe("voidPostedVoucher", () => {
-  it("voids the entry and posts its reversal, attributed to the placeholder user (D32)", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+  it("voids the entry and posts its reversal, attributed to whoever voided it (T-018)", async () => {
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const posted = await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
 
-    const result = await voidPostedVoucher(db, {
-      entryId: posted.entryId,
-      reason: "Wrong account used",
-      reversalDate: "2024-01-31",
-      periodId: periods.jan2024.id,
-    });
+    const result = await voidPostedVoucher(
+      db,
+      {
+        entryId: posted.entryId,
+        reason: "Wrong account used",
+        reversalDate: "2024-01-31",
+        periodId: periods.jan2024.id,
+      },
+      user.id,
+    );
 
     expect(result.voided.status).toBe("voided");
     expect(result.reversal.status).toBe("posted");
     expect(result.reversal.reversesEntryId).toBe(posted.entryId);
 
-    const placeholder = await db.query
-      .select({ id: appUser.id })
-      .from(appUser)
-      .where(eq(appUser.username, PLACEHOLDER_USER_USERNAME))
-      .get();
     const logs = await db.query.select().from(auditLog).where(eq(auditLog.recordId, posted.entryId)).all();
-    expect(logs.some((l) => l.action === "journal_entry.void" && l.userId === placeholder?.id)).toBe(true);
+    expect(logs.some((l) => l.action === "journal_entry.void" && l.userId === user.id)).toBe(true);
   });
 
   it("posts the reversal into the period passed in, never a different one (trap 2)", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const posted = await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
 
-    const result = await voidPostedVoucher(db, {
-      entryId: posted.entryId,
-      reason: "Duplicate entry",
-      reversalDate: "2024-01-31",
-      periodId: periods.jan2024.id,
-    });
+    const result = await voidPostedVoucher(
+      db,
+      {
+        entryId: posted.entryId,
+        reason: "Duplicate entry",
+        reversalDate: "2024-01-31",
+        periodId: periods.jan2024.id,
+      },
+      user.id,
+    );
 
     expect(result.reversal.periodId).toBe(periods.jan2024.id);
   });
 
   it("the reversal's lines have debit and credit swapped from the original", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const posted = await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
     const originalLines = await db.query
       .select()
@@ -426,12 +443,16 @@ describe("voidPostedVoucher", () => {
       .where(eq(journalEntryLine.entryId, posted.entryId))
       .all();
 
-    const result = await voidPostedVoucher(db, {
-      entryId: posted.entryId,
-      reason: "Correction",
-      reversalDate: "2024-01-31",
-      periodId: periods.jan2024.id,
-    });
+    const result = await voidPostedVoucher(
+      db,
+      {
+        entryId: posted.entryId,
+        reason: "Correction",
+        reversalDate: "2024-01-31",
+        periodId: periods.jan2024.id,
+      },
+      user.id,
+    );
     const reversalLines = await db.query
       .select()
       .from(journalEntryLine)
@@ -446,53 +467,67 @@ describe("voidPostedVoucher", () => {
   });
 
   it("passes through the engine's refusal of a blank reason", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const posted = await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
 
     await expect(
-      voidPostedVoucher(db, {
-        entryId: posted.entryId,
-        reason: "",
-        reversalDate: "2024-01-31",
-        periodId: periods.jan2024.id,
-      }),
+      voidPostedVoucher(
+        db,
+        {
+          entryId: posted.entryId,
+          reason: "",
+          reversalDate: "2024-01-31",
+          periodId: periods.jan2024.id,
+        },
+        user.id,
+      ),
     ).rejects.toThrow(InvalidStatusError);
   });
 
   it("passes through the engine's refusal to void an already-voided entry", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const posted = await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
-    await voidPostedVoucher(db, {
-      entryId: posted.entryId,
-      reason: "First void",
-      reversalDate: "2024-01-31",
-      periodId: periods.jan2024.id,
-    });
-
-    await expect(
-      voidPostedVoucher(db, {
+    await voidPostedVoucher(
+      db,
+      {
         entryId: posted.entryId,
-        reason: "Second void",
+        reason: "First void",
         reversalDate: "2024-01-31",
         periodId: periods.jan2024.id,
-      }),
+      },
+      user.id,
+    );
+
+    await expect(
+      voidPostedVoucher(
+        db,
+        {
+          entryId: posted.entryId,
+          reason: "Second void",
+          reversalDate: "2024-01-31",
+          periodId: periods.jan2024.id,
+        },
+        user.id,
+      ),
     ).rejects.toThrow(InvalidStatusError);
   });
 
   it("passes through the engine's refusal to void a draft entry", async () => {
-    const { db, barangay, user, accounts, periods } = await fixture();
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
     const draft = await createDraftEntry(db, {
       barangayId: barangay.id,
       periodId: periods.jan2024.id,
@@ -507,38 +542,42 @@ describe("voidPostedVoucher", () => {
     });
 
     await expect(
-      voidPostedVoucher(db, {
-        entryId: draft.id,
-        reason: "x",
-        reversalDate: "2024-01-31",
-        periodId: periods.jan2024.id,
-      }),
+      voidPostedVoucher(
+        db,
+        {
+          entryId: draft.id,
+          reason: "x",
+          reversalDate: "2024-01-31",
+          periodId: periods.jan2024.id,
+        },
+        user.id,
+      ),
     ).rejects.toThrow(InvalidStatusError);
   });
 
   it("passes through the engine's refusal to post a reversal into a closed period", async () => {
-    const { db, barangay, accounts, periods } = await fixture();
+    const { db, barangay, user, admin, accounts, periods } = await seedEngineFixture();
     const posted = await postNewVoucher(
       db,
       electricBill(barangay.id, periods.jan2024.id, {
         expense: accounts.electricity.id,
         cash: accounts.cashInBank.id,
       }),
+      user.id,
     );
-    const placeholder = await db.query
-      .select({ id: appUser.id })
-      .from(appUser)
-      .where(eq(appUser.username, PLACEHOLDER_USER_USERNAME))
-      .get();
-    await closePeriod(db, periods.jan2024.id, placeholder!.id);
+    await closePeriod(db, periods.jan2024.id, admin.id);
 
     await expect(
-      voidPostedVoucher(db, {
-        entryId: posted.entryId,
-        reason: "x",
-        reversalDate: "2024-01-31",
-        periodId: periods.jan2024.id,
-      }),
+      voidPostedVoucher(
+        db,
+        {
+          entryId: posted.entryId,
+          reason: "x",
+          reversalDate: "2024-01-31",
+          periodId: periods.jan2024.id,
+        },
+        user.id,
+      ),
     ).rejects.toThrow(ClosedPeriodError);
   });
 });

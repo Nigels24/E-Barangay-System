@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { seedEngineFixture } from "../../engine/__tests__/fixtures";
-import { seedPlaceholderUser } from "../../../db/seed/users";
 import { toCentavos } from "../../money";
 import {
   addReconcilingItemAction,
@@ -19,9 +18,7 @@ import {
 import { postNewVoucher } from "../journal";
 
 async function seedForWrites() {
-  const fixture = await seedEngineFixture();
-  await seedPlaceholderUser(fixture.db);
-  return fixture;
+  return seedEngineFixture();
 }
 
 describe("listBankGlAccounts", () => {
@@ -40,16 +37,20 @@ describe("listBankGlAccounts", () => {
 });
 
 describe("createBankAccountAction / listBankAccounts", () => {
-  it("adds a bank account, resolving the placeholder actor (D32) without a screen ever passing one", async () => {
+  it("adds a bank account, attributed to whoever added it (T-018)", async () => {
     const fixture = await seedForWrites();
 
-    await createBankAccountAction(fixture.db, {
-      barangayId: fixture.barangay.id,
-      bankName: "Land Bank of the Philippines",
-      accountNo: "1234-5678-90",
-      accountName: "General Fund",
-      glAccountId: fixture.accounts.cashInBank.id,
-    });
+    await createBankAccountAction(
+      fixture.db,
+      {
+        barangayId: fixture.barangay.id,
+        bankName: "Land Bank of the Philippines",
+        accountNo: "1234-5678-90",
+        accountName: "General Fund",
+        glAccountId: fixture.accounts.cashInBank.id,
+      },
+      fixture.user.id,
+    );
 
     const rows = await listBankAccounts(fixture.db, fixture.barangay.id);
     expect(rows).toHaveLength(1);
@@ -59,13 +60,17 @@ describe("createBankAccountAction / listBankAccounts", () => {
 });
 
 async function seedBankAccountAndContext(fixture: Awaited<ReturnType<typeof seedForWrites>>): Promise<WorksheetContext> {
-  const created = await createBankAccountAction(fixture.db, {
-    barangayId: fixture.barangay.id,
-    bankName: "Land Bank of the Philippines",
-    accountNo: "1234-5678-90",
-    accountName: "General Fund",
-    glAccountId: fixture.accounts.cashInBank.id,
-  });
+  const created = await createBankAccountAction(
+    fixture.db,
+    {
+      barangayId: fixture.barangay.id,
+      bankName: "Land Bank of the Philippines",
+      accountNo: "1234-5678-90",
+      accountName: "General Fund",
+      glAccountId: fixture.accounts.cashInBank.id,
+    },
+    fixture.user.id,
+  );
   return {
     bankAccountId: created.id,
     periodId: fixture.periods.jan2024.id,
@@ -89,23 +94,31 @@ describe("startReconciliationAction", () => {
     const fixture = await seedForWrites();
     const context = await seedBankAccountAndContext(fixture);
 
-    await postNewVoucher(fixture.db, {
-      barangayId: fixture.barangay.id,
-      periodId: fixture.periods.jan2024.id,
-      entryDate: "2024-01-05",
-      book: "CRJ",
-      particulars: "Collection deposited",
-      lines: [
-        { accountId: fixture.accounts.cashInBank.id, side: "debit", amountCentavos: toCentavos(10000) },
-        { accountId: fixture.accounts.ira.id, side: "credit", amountCentavos: toCentavos(10000) },
-      ],
-    });
+    await postNewVoucher(
+      fixture.db,
+      {
+        barangayId: fixture.barangay.id,
+        periodId: fixture.periods.jan2024.id,
+        entryDate: "2024-01-05",
+        book: "CRJ",
+        particulars: "Collection deposited",
+        lines: [
+          { accountId: fixture.accounts.cashInBank.id, side: "debit", amountCentavos: toCentavos(10000) },
+          { accountId: fixture.accounts.ira.id, side: "credit", amountCentavos: toCentavos(10000) },
+        ],
+      },
+      fixture.user.id,
+    );
 
-    const worksheet = await startReconciliationAction(fixture.db, {
-      context,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(9500),
-    });
+    const worksheet = await startReconciliationAction(
+      fixture.db,
+      {
+        context,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(9500),
+      },
+      fixture.user.id,
+    );
 
     expect(worksheet.liveBookBalanceCentavos).toBe(toCentavos(10000));
     expect(worksheet.reconciliation.bookBalanceCentavos).toBe(toCentavos(10000));
@@ -117,18 +130,26 @@ describe("updateReconciliationHeaderAction", () => {
   it("corrects a typo in the statement balance", async () => {
     const fixture = await seedForWrites();
     const context = await seedBankAccountAndContext(fixture);
-    const started = await startReconciliationAction(fixture.db, {
-      context,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(5000),
-    });
+    const started = await startReconciliationAction(
+      fixture.db,
+      {
+        context,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(5000),
+      },
+      fixture.user.id,
+    );
 
-    const updated = await updateReconciliationHeaderAction(fixture.db, {
-      context,
-      reconciliationId: started.reconciliation.id,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(50000),
-    });
+    const updated = await updateReconciliationHeaderAction(
+      fixture.db,
+      {
+        context,
+        reconciliationId: started.reconciliation.id,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(50000),
+      },
+      fixture.user.id,
+    );
     expect(updated.reconciliation.statementBalanceCentavos).toBe(toCentavos(50000));
   });
 });
@@ -137,30 +158,42 @@ describe("addReconcilingItemAction", () => {
   it("folds a bank-side item into the adjusted bank balance and a book-side item into the adjusted book balance", async () => {
     const fixture = await seedForWrites();
     const context = await seedBankAccountAndContext(fixture);
-    const started = await startReconciliationAction(fixture.db, {
-      context,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(10000),
-    });
+    const started = await startReconciliationAction(
+      fixture.db,
+      {
+        context,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(10000),
+      },
+      fixture.user.id,
+    );
 
-    let worksheet = await addReconcilingItemAction(fixture.db, {
-      context,
-      reconciliationId: started.reconciliation.id,
-      side: "bank",
-      itemType: "checks_issued_not_taken_up",
-      amountCentavos: -toCentavos(500),
-      explanation: "Check #1001 outstanding",
-    });
+    let worksheet = await addReconcilingItemAction(
+      fixture.db,
+      {
+        context,
+        reconciliationId: started.reconciliation.id,
+        side: "bank",
+        itemType: "checks_issued_not_taken_up",
+        amountCentavos: -toCentavos(500),
+        explanation: "Check #1001 outstanding",
+      },
+      fixture.user.id,
+    );
     expect(worksheet.adjustedBankBalanceCentavos).toBe(toCentavos(9500));
 
-    worksheet = await addReconcilingItemAction(fixture.db, {
-      context,
-      reconciliationId: started.reconciliation.id,
-      side: "book",
-      itemType: "debit_memo",
-      amountCentavos: -toCentavos(150),
-      explanation: "Bank service charge",
-    });
+    worksheet = await addReconcilingItemAction(
+      fixture.db,
+      {
+        context,
+        reconciliationId: started.reconciliation.id,
+        side: "book",
+        itemType: "debit_memo",
+        amountCentavos: -toCentavos(150),
+        explanation: "Bank service charge",
+      },
+      fixture.user.id,
+    );
     expect(worksheet.adjustedBookBalanceCentavos).toBe(toCentavos(0) - toCentavos(150));
     expect(worksheet.items).toHaveLength(2);
   });
@@ -170,19 +203,23 @@ async function postCheck(
   fixture: Awaited<ReturnType<typeof seedForWrites>>,
   overrides: { checkNo: string; checkDate: string; amount: number },
 ) {
-  return postNewVoucher(fixture.db, {
-    barangayId: fixture.barangay.id,
-    periodId: fixture.periods.jan2024.id,
-    entryDate: overrides.checkDate,
-    book: "CkDJ",
-    particulars: "Payment of office supplies",
-    checkNo: overrides.checkNo,
-    checkDate: overrides.checkDate,
-    lines: [
-      { accountId: fixture.accounts.electricity.id, side: "debit", amountCentavos: toCentavos(overrides.amount) },
-      { accountId: fixture.accounts.cashInBank.id, side: "credit", amountCentavos: toCentavos(overrides.amount) },
-    ],
-  });
+  return postNewVoucher(
+    fixture.db,
+    {
+      barangayId: fixture.barangay.id,
+      periodId: fixture.periods.jan2024.id,
+      entryDate: overrides.checkDate,
+      book: "CkDJ",
+      particulars: "Payment of office supplies",
+      checkNo: overrides.checkNo,
+      checkDate: overrides.checkDate,
+      lines: [
+        { accountId: fixture.accounts.electricity.id, side: "debit", amountCentavos: toCentavos(overrides.amount) },
+        { accountId: fixture.accounts.cashInBank.id, side: "credit", amountCentavos: toCentavos(overrides.amount) },
+      ],
+    },
+    fixture.user.id,
+  );
 }
 
 describe("deriveOutstandingChecks", () => {
@@ -207,7 +244,7 @@ describe("deriveOutstandingChecks", () => {
   it("excludes a check already marked cleared as of the as-of date", async () => {
     const fixture = await seedForWrites();
     const posted = await postCheck(fixture, { checkNo: "0001234", checkDate: "2024-01-10", amount: 1000 });
-    await markCheckClearedAction(fixture.db, { entryId: posted.entryId, clearedDate: "2024-01-15" });
+    await markCheckClearedAction(fixture.db, { entryId: posted.entryId, clearedDate: "2024-01-15" }, fixture.user.id);
 
     const rows = await deriveOutstandingChecks(fixture.db, fixture.barangay.id, fixture.accounts.cashInBank.id, "2024-01-31");
     expect(rows).toEqual([]);
@@ -216,7 +253,7 @@ describe("deriveOutstandingChecks", () => {
   it("still lists a check that cleared after the as-of date", async () => {
     const fixture = await seedForWrites();
     const posted = await postCheck(fixture, { checkNo: "0001234", checkDate: "2024-01-10", amount: 1000 });
-    await markCheckClearedAction(fixture.db, { entryId: posted.entryId, clearedDate: "2024-02-05" });
+    await markCheckClearedAction(fixture.db, { entryId: posted.entryId, clearedDate: "2024-02-05" }, fixture.user.id);
 
     const rows = await deriveOutstandingChecks(fixture.db, fixture.barangay.id, fixture.accounts.cashInBank.id, "2024-01-31");
     expect(rows).toHaveLength(1);
@@ -226,19 +263,27 @@ describe("deriveOutstandingChecks", () => {
     const fixture = await seedForWrites();
     const context = await seedBankAccountAndContext(fixture);
     const posted = await postCheck(fixture, { checkNo: "0001234", checkDate: "2024-01-10", amount: 1000 });
-    const started = await startReconciliationAction(fixture.db, {
-      context,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(9000),
-    });
-    await addReconcilingItemAction(fixture.db, {
-      context,
-      reconciliationId: started.reconciliation.id,
-      side: "bank",
-      itemType: "checks_issued_not_taken_up",
-      amountCentavos: -toCentavos(1000),
-      relatedEntryId: posted.entryId,
-    });
+    const started = await startReconciliationAction(
+      fixture.db,
+      {
+        context,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(9000),
+      },
+      fixture.user.id,
+    );
+    await addReconcilingItemAction(
+      fixture.db,
+      {
+        context,
+        reconciliationId: started.reconciliation.id,
+        side: "bank",
+        itemType: "checks_issued_not_taken_up",
+        amountCentavos: -toCentavos(1000),
+        relatedEntryId: posted.entryId,
+      },
+      fixture.user.id,
+    );
 
     const rows = await deriveOutstandingChecks(fixture.db, fixture.barangay.id, fixture.accounts.cashInBank.id, "2024-01-31");
     expect(rows).toEqual([]);
@@ -249,29 +294,41 @@ describe("postAdjustingEntryAction", () => {
   it("posts a real two-line voucher for a positive (book balance increases) item and links it", async () => {
     const fixture = await seedForWrites();
     const context = await seedBankAccountAndContext(fixture);
-    const started = await startReconciliationAction(fixture.db, {
-      context,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(10000),
-    });
-    const withItem = await addReconcilingItemAction(fixture.db, {
-      context,
-      reconciliationId: started.reconciliation.id,
-      side: "book",
-      itemType: "credit_memo",
-      amountCentavos: toCentavos(200),
-      explanation: "Interest credited by the bank",
-    });
+    const started = await startReconciliationAction(
+      fixture.db,
+      {
+        context,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(10000),
+      },
+      fixture.user.id,
+    );
+    const withItem = await addReconcilingItemAction(
+      fixture.db,
+      {
+        context,
+        reconciliationId: started.reconciliation.id,
+        side: "book",
+        itemType: "credit_memo",
+        amountCentavos: toCentavos(200),
+        explanation: "Interest credited by the bank",
+      },
+      fixture.user.id,
+    );
     const item = withItem.items[0];
 
-    const { worksheet, posted } = await postAdjustingEntryAction(fixture.db, {
-      context,
-      reconcilingItemId: item.id,
-      itemAmountCentavos: item.amountCentavos,
-      entryDate: "2024-01-31",
-      particulars: "Bank reconciliation adjustment — interest credited",
-      offsetAccountId: fixture.accounts.ira.id,
-    });
+    const { worksheet, posted } = await postAdjustingEntryAction(
+      fixture.db,
+      {
+        context,
+        reconcilingItemId: item.id,
+        itemAmountCentavos: item.amountCentavos,
+        entryDate: "2024-01-31",
+        particulars: "Bank reconciliation adjustment — interest credited",
+        offsetAccountId: fixture.accounts.ira.id,
+      },
+      fixture.user.id,
+    );
 
     expect(posted.jevNo).toBeTruthy();
     expect(worksheet.liveBookBalanceCentavos).toBe(toCentavos(200));
@@ -285,41 +342,57 @@ describe("postAdjustingEntryAction", () => {
   it("posts the opposite sides for a negative (book balance decreases) item", async () => {
     const fixture = await seedForWrites();
     const context = await seedBankAccountAndContext(fixture);
-    const started = await startReconciliationAction(fixture.db, {
-      context,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(10000),
-    });
+    const started = await startReconciliationAction(
+      fixture.db,
+      {
+        context,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(10000),
+      },
+      fixture.user.id,
+    );
     // Give the account an opening balance so a credit for the service charge has something to draw down.
-    await postNewVoucher(fixture.db, {
-      barangayId: fixture.barangay.id,
-      periodId: fixture.periods.jan2024.id,
-      entryDate: "2024-01-02",
-      book: "CRJ",
-      particulars: "Opening deposit",
-      lines: [
-        { accountId: fixture.accounts.cashInBank.id, side: "debit", amountCentavos: toCentavos(1000) },
-        { accountId: fixture.accounts.ira.id, side: "credit", amountCentavos: toCentavos(1000) },
-      ],
-    });
-    const withItem = await addReconcilingItemAction(fixture.db, {
-      context,
-      reconciliationId: started.reconciliation.id,
-      side: "book",
-      itemType: "debit_memo",
-      amountCentavos: -toCentavos(150),
-      explanation: "Bank service charge",
-    });
+    await postNewVoucher(
+      fixture.db,
+      {
+        barangayId: fixture.barangay.id,
+        periodId: fixture.periods.jan2024.id,
+        entryDate: "2024-01-02",
+        book: "CRJ",
+        particulars: "Opening deposit",
+        lines: [
+          { accountId: fixture.accounts.cashInBank.id, side: "debit", amountCentavos: toCentavos(1000) },
+          { accountId: fixture.accounts.ira.id, side: "credit", amountCentavos: toCentavos(1000) },
+        ],
+      },
+      fixture.user.id,
+    );
+    const withItem = await addReconcilingItemAction(
+      fixture.db,
+      {
+        context,
+        reconciliationId: started.reconciliation.id,
+        side: "book",
+        itemType: "debit_memo",
+        amountCentavos: -toCentavos(150),
+        explanation: "Bank service charge",
+      },
+      fixture.user.id,
+    );
     const item = withItem.items[0];
 
-    const { worksheet } = await postAdjustingEntryAction(fixture.db, {
-      context,
-      reconcilingItemId: item.id,
-      itemAmountCentavos: item.amountCentavos,
-      entryDate: "2024-01-31",
-      particulars: "Bank reconciliation adjustment — service charge",
-      offsetAccountId: fixture.accounts.electricity.id,
-    });
+    const { worksheet } = await postAdjustingEntryAction(
+      fixture.db,
+      {
+        context,
+        reconcilingItemId: item.id,
+        itemAmountCentavos: item.amountCentavos,
+        entryDate: "2024-01-31",
+        particulars: "Bank reconciliation adjustment — service charge",
+        offsetAccountId: fixture.accounts.electricity.id,
+      },
+      fixture.user.id,
+    );
 
     expect(worksheet.liveBookBalanceCentavos).toBe(toCentavos(1000) - toCentavos(150));
   });
@@ -329,47 +402,71 @@ describe("finalizeReconciliationAction", () => {
   it("finalises cleanly when the variance is zero", async () => {
     const fixture = await seedForWrites();
     const context = await seedBankAccountAndContext(fixture);
-    const started = await startReconciliationAction(fixture.db, {
-      context,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(0),
-    });
+    const started = await startReconciliationAction(
+      fixture.db,
+      {
+        context,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(0),
+      },
+      fixture.user.id,
+    );
 
-    const final = await finalizeReconciliationAction(fixture.db, {
-      context,
-      reconciliationId: started.reconciliation.id,
-    });
+    const final = await finalizeReconciliationAction(
+      fixture.db,
+      {
+        context,
+        reconciliationId: started.reconciliation.id,
+      },
+      fixture.user.id,
+    );
     expect(final.reconciliation.status).toBe("final");
   });
 
   it("refuses without an override reason when the variance is nonzero", async () => {
     const fixture = await seedForWrites();
     const context = await seedBankAccountAndContext(fixture);
-    const started = await startReconciliationAction(fixture.db, {
-      context,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(500),
-    });
+    const started = await startReconciliationAction(
+      fixture.db,
+      {
+        context,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(500),
+      },
+      fixture.user.id,
+    );
 
     await expect(
-      finalizeReconciliationAction(fixture.db, { context, reconciliationId: started.reconciliation.id }),
+      finalizeReconciliationAction(
+        fixture.db,
+        { context, reconciliationId: started.reconciliation.id },
+        fixture.user.id,
+      ),
     ).rejects.toThrow();
   });
 
   it("finalises with a written override reason", async () => {
     const fixture = await seedForWrites();
     const context = await seedBankAccountAndContext(fixture);
-    const started = await startReconciliationAction(fixture.db, {
-      context,
-      statementDate: "2024-01-31",
-      statementBalanceCentavos: toCentavos(500),
-    });
+    const started = await startReconciliationAction(
+      fixture.db,
+      {
+        context,
+        statementDate: "2024-01-31",
+        statementBalanceCentavos: toCentavos(500),
+      },
+      fixture.user.id,
+    );
 
-    const final = await finalizeReconciliationAction(fixture.db, {
-      context,
-      reconciliationId: started.reconciliation.id,
-      varianceOverrideReason: "Approved pending the bank's own correction next month.",
-    });
+    const final = await finalizeReconciliationAction(
+      fixture.db,
+      {
+        context,
+        reconciliationId: started.reconciliation.id,
+        varianceOverrideReason: "Approved pending the bank's own correction next month.",
+      },
+      fixture.user.id,
+    );
     expect(final.reconciliation.status).toBe("final");
     expect(final.reconciliation.varianceOverrideReason).toContain("Approved");
   });

@@ -1,7 +1,7 @@
 # System Flow — eBarangay Books
 
 What gets built, in what order, and what is done. Updated every time a task
-closes. Last updated at T-017 (closed).
+closes. Last updated at T-018 (closed).
 
 ---
 
@@ -81,19 +81,118 @@ Legend: ✅ done (Reviewer PASS) · 🔄 in progress · ⬜ not started · ⏸�
 | # | Feature | Status | Task | Notes |
 |---|---|---|---|---|
 | 4.1 | Formal print stylesheet + report headers | ✅ | T-015 | Titles only — no invented government letterhead, see T-015 notes |
-| 4.2 | Rendered signatory lines on printed reports | ⬜ | | Needs 5.2 |
+| 4.2 | Rendered signatory lines on printed reports | ✅ | T-016 | Shipped together with 5.2 — see T-016 notes |
 
 ### Phase 5 — Admin, users, signatories
 
 | # | Feature | Status | Task | Notes |
 |---|---|---|---|---|
-| 5.1 | Real users + login (D24) | ⬜ | | Until then every action is one placeholder actor — D32 |
+| 5.1 | Real users + login (D24) | ✅ | T-018 | D32's placeholder actor retired; every write attributes to whoever is signed in — see T-018 notes |
 | 5.2 | Signatory data entry (D25) | ✅ | T-016 | Also wired into 4.2's printed signature lines — see T-016 notes |
 | 5.3 | Chart-of-accounts admin | ✅ | T-017 | Resolve a provisional code + activate/deactivate; adding new accounts / loading the full RCA still blocked on the client — see T-017 notes |
 
 ---
 
 ## Right now
+
+**T-018 — Real users + login (5.1, D24): CLOSED.**
+
+The last development item in the project's original plan. Retires D32's
+single placeholder actor entirely: `requirePostingUserId()` and
+`MissingPostingUserError` are gone from `src/lib/queries/users.ts`, and
+every write action across the app (post/void a voucher, close/reopen a
+period, add a signatory, add/dispose a fixed asset, grant/liquidate an
+advance, every bank-reconciliation action, resolve a provisional code,
+activate/deactivate an account) now takes an explicit `actorUserId`
+parameter instead of resolving one implicitly. The actor is no longer a
+guess a query makes — it is whoever is signed in, threaded down from
+`App.tsx`'s own session state through every screen prop.
+
+Login here (per D24, confirmed again by the schema's own comment on
+`app_user.passwordHash`) is a name/role picker, not a password: one shared
+office PC, and a password checked against nobody in particular buys no
+real security, only friction. `password_hash` moves from `NOT NULL` to
+nullable (`drizzle/0005_messy_clea.sql`, a full table rebuild — SQLite's
+only way to drop a `NOT NULL`, same pattern every prior migration in this
+project uses) rather than being dropped, since a future password-based
+login would want the column back at no cost, and the one historical row
+that ever had a value there (the D32 placeholder actor) keeps it — D11
+never relabels a historical record, even cosmetically.
+
+- `src/lib/engine/users.ts` (new) — `createUser()` and `setUserActive()`,
+  the same audit-logged, single-transaction write shape every other engine
+  module uses (D30). Solves the one real bootstrap problem: every other
+  write attributes to an actor who already exists, but the very first user
+  has nobody to be created *by*. `createUser()` allocates the new row's id
+  before building the write batch (`nextRowId`, same as every other engine
+  write) and, when no `createdBy` is given, audit-logs the row as created
+  by itself — which is exactly what happened. `setUserActive()` refuses to
+  deactivate the last active Administrator (a hard stop, not a warning —
+  there is no recovery path short of editing the database directly).
+- `src/lib/queries/users.ts` — `listActiveUsers()` (real people only, the
+  D32 placeholder excluded by name, feeds the who's-working picker),
+  `listAllUsers()` (active and inactive, feeds the admin table),
+  `createFirstUserAction()` (always Administrator, regardless of what's
+  passed — nobody else exists yet to grant that role afterward if it were
+  wrong), `createUserAction()`, `setUserActiveAction()`.
+- `src/lib/userForm.ts` (new) — the add-user form's pure rules (blank
+  checks, a friendly duplicate-username check ahead of the schema's own
+  `UNIQUE`), same split every other `*Form.ts` module in this project uses.
+- `src/screens/FirstRunSetup.tsx` (+ `.css`, new) — shown once, only when
+  `listActiveUsers` comes back empty (a brand-new database, or one seeded
+  before T-018). No password field; whoever fills it in is signed in as
+  the first user immediately, no separate first-sign-in step.
+- `src/screens/WhoIsWorking.tsx` (+ `.css`, new) — "Choose your name —
+  everything you do is recorded against it." The only place a session's
+  actor gets chosen, reached fresh or via "Switch user."
+- `src/screens/UserAdmin.tsx` (+ `.css`, new) — add a user, activate/
+  deactivate one. Administrator-only, gated the same way
+  `ChartOfAccountsAdmin.tsx` already was: reachable only when
+  `currentUserRole === "admin"`, at the UI level only — nothing at the
+  engine layer stops `createUserAction`/`setUserActiveAction` from being
+  called with a non-admin's id. That gap already existed for the chart of
+  accounts; T-018 just extends the same posture to user management itself
+  rather than inventing a new one. Worth revisiting if this app ever stops
+  being a single shared office PC with no adversarial user model.
+- `src/components/AppShell.tsx` (+ `.css`) — a topbar chip showing the
+  signed-in user's name with a "Switch user" control, shown only once a
+  session is active.
+- `src/components/icons.tsx` — `UsersIcon`, for the who's-working picker
+  and the nav entry.
+- `App.tsx` — a `Session` state machine (`loading` → `firstRun` or
+  `picking` → `active`) driven off `listActiveUsers` once the database
+  itself is ready. Every screen past that point receives `currentUserId`
+  (and `currentUserRole`, where a screen gates on it) as a prop.
+  `switchUser()` always returns to the bare picker screen, not wherever
+  the previous user happened to be — an admin-only screen must never stay
+  on-screen for whoever is picked next.
+- `src/db/seed/index.ts` — no longer seeds a user. `runSeed()` now returns
+  `{ barangays, accounts }` only; the app's own first-run screen creates
+  the first real user. `seedPlaceholderUser` and `PLACEHOLDER_USER_USERNAME`
+  stay in `src/db/seed/users.ts`, unused, for the same D11 reason
+  `password_hash` stays on the schema — the real production database
+  already has that exact row, with real `journal_entry`/`audit_log` rows
+  pointing at it by id.
+
+488 tests total, up from 473 at T-017. Golden test unchanged; `tsc --noEmit`,
+build, lint, and `cargo check` all clean.
+
+Live-verified end to end on a throwaway database (`sqlite:ebarangay-verify-
+users.db`, both `DB_URL` constants repointed, `cargo build`'d, reverted and
+rebuilt afterward) via the WebDriver harness, screenshotted at every step
+rather than trusting `innerText` alone: the who's-working picker listed all
+three real users already on that database; signed in as the Administrator
+(Juana Sapilan) and reached Select records with her name and "Switch user"
+in the topbar and both admin-only links visible; opened Manage users, added
+a new Bookkeeper (Teresa Santos), confirmed the success message and her row
+appearing in the table; deactivated her and confirmed the Inactive badge and
+the button flipping to Activate; switched users and confirmed she no longer
+appeared in the picker (deactivated users are excluded); signed in as a
+non-admin (Miguel Reyes, Bookkeeper) and confirmed both admin-only links
+were correctly absent from his view. All screens rendered cleanly and
+legibly in every screenshot. `APP_DB_URL`/`DB_URL` reverted to
+`sqlite:ebarangay.db` afterward and the full validation loop re-run clean
+against that reverted state.
 
 **T-017 — Chart-of-accounts admin (5.3): CLOSED.**
 
@@ -679,17 +778,10 @@ review passes (each blocked by unrelated circumstances — a busy screen, a
 colliding session). DOM-level structure is confirmed correct in both cases;
 pixel legibility isn't yet. Worth a glance next time the app is open.
 
-**Current task:** none planned yet. 4.2, 5.2, and 5.3 are all done
-(T-016, T-017). **5.1 (real users + login, D24) is the only Phase 5 item
-left, and the only development work left in the whole project's original
-plan.** It is architecturally invasive: password hashing (a new
-dependency/security surface this app has none of yet), a login screen,
-session state threaded through `App.tsx`, and migrating every existing
-`requirePostingUserId()` call site (every write in the app) to resolve a
-real current session user instead of the D32 placeholder. Given the size
-and the security-sensitive, hard-to-reverse nature of those choices, check
-with the user on approach before starting — the T-017 precedent (asking
-before committing to 5.1 vs. 5.3) is exactly this situation, not a one-off.
+**Current task:** none planned yet. 4.2, 5.1, 5.2, and 5.3 are all done
+(T-016, T-017, T-018) — **every development item in the project's original
+plan is now built.** What remains is either the "Not development work —
+waiting on the client" list below, or whatever the user asks for next.
 
 ---
 
@@ -746,19 +838,11 @@ In build order (see "The build order, and why" above).
   shipped together with 5.2 (the write side has no value without the read
   side, and the read side was small once the write side existed).
 
-### Phase 5 — admin, users, signatories
+### Phase 5 — admin, users, signatories — ✅ complete (T-016 through T-018)
 
-- **5.1 — Real users + login (D24).** The only development work left in
-  the project's original plan. Until this exists, every write in the
-  system is attributed to one placeholder actor (D32,
-  `requirePostingUserId()`) — every screen built so far (T-007 through
-  T-017) depends on that pattern staying in place until this lands.
-  Architecturally the biggest remaining item: password hashing (a new
-  dependency/security surface this app has none of yet), a login screen,
-  session state threaded through `App.tsx`, and migrating every existing
-  `requirePostingUserId()` call site to resolve a real current session
-  user instead of the placeholder lookup. Check scope/approach with the
-  user before starting, the same way T-017 was scoped only after asking.
+- **5.1 — Real users + login (D24).** ✅ Done — T-018. D32's placeholder
+  actor is fully retired; every write in the app now attributes to
+  whoever is signed in via the who's-working picker, not a guess.
 - **5.2 — Signatory data entry (D25).** ✅ Done — T-016, alongside 4.2.
 - **5.3 — Chart-of-accounts admin.** ✅ Done — T-017. Resolving a
   provisional code and activating/deactivating an account are both live;

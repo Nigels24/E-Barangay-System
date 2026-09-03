@@ -1,12 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { seedEngineFixture } from "../../engine/__tests__/fixtures";
-import { seedPlaceholderUser, PLACEHOLDER_USER_USERNAME } from "../../../db/seed/users";
 import { closePeriod } from "../../engine/period";
 import { InvalidStatusError } from "../../engine/errors";
 import { createDraftEntry, postEntry } from "../../engine/post";
 import { toCentavos } from "../../money";
-import { accountingPeriod, appUser, auditLog } from "../../../db/schema";
+import { accountingPeriod, auditLog } from "../../../db/schema";
 import {
   countPeriodEntries,
   openPeriodSummary,
@@ -14,13 +13,6 @@ import {
   reopenPeriodAction,
   InvalidPeriodSelectionError,
 } from "../periods";
-
-/** The engine fixture plus the placeholder user the real app writes as (D32). */
-async function fixture() {
-  const seeded = await seedEngineFixture();
-  await seedPlaceholderUser(seeded.db);
-  return seeded;
-}
 
 describe("openPeriodSummary", () => {
   it("opens a month that has never existed and reports it empty and open", async () => {
@@ -133,25 +125,20 @@ describe("countPeriodEntries", () => {
 });
 
 describe("closePeriodAction", () => {
-  it("closes an open period and attributes it to the placeholder user (D32)", async () => {
-    const { db, periods } = await fixture();
-    const summary = await closePeriodAction(db, periods.jan2024.id);
+  it("closes an open period and attributes it to whoever closed it (T-018)", async () => {
+    const { db, periods, admin } = await seedEngineFixture();
+    const summary = await closePeriodAction(db, periods.jan2024.id, admin.id);
 
     expect(summary.status).toBe("closed");
     expect(summary.periodId).toBe(periods.jan2024.id);
 
-    const placeholder = await db.query
-      .select({ id: appUser.id })
-      .from(appUser)
-      .where(eq(appUser.username, PLACEHOLDER_USER_USERNAME))
-      .get();
     const logs = await db.query.select().from(auditLog).where(eq(auditLog.action, "period.close")).all();
     expect(logs).toHaveLength(1);
-    expect(logs[0].userId).toBe(placeholder?.id);
+    expect(logs[0].userId).toBe(admin.id);
   });
 
   it("preserves the entry count across the close", async () => {
-    const { db, barangay, user, accounts, periods } = await fixture();
+    const { db, barangay, user, admin, accounts, periods } = await seedEngineFixture();
     const draft = await createDraftEntry(db, {
       barangayId: barangay.id,
       periodId: periods.jan2024.id,
@@ -166,49 +153,49 @@ describe("closePeriodAction", () => {
     });
     await postEntry(db, { entryId: draft.id, postedBy: user.id });
 
-    const summary = await closePeriodAction(db, periods.jan2024.id);
+    const summary = await closePeriodAction(db, periods.jan2024.id, admin.id);
     expect(summary.entryCount).toBe(1);
   });
 
   it("passes through the engine's refusal to close an already-closed period", async () => {
-    const { db, periods } = await fixture();
-    await closePeriodAction(db, periods.jan2024.id);
-    await expect(closePeriodAction(db, periods.jan2024.id)).rejects.toThrow(InvalidStatusError);
+    const { db, periods, admin } = await seedEngineFixture();
+    await closePeriodAction(db, periods.jan2024.id, admin.id);
+    await expect(closePeriodAction(db, periods.jan2024.id, admin.id)).rejects.toThrow(InvalidStatusError);
   });
 });
 
 describe("reopenPeriodAction", () => {
   it("reopens a closed period given a reason, round-tripping the status", async () => {
-    const { db, periods } = await fixture();
-    await closePeriodAction(db, periods.jan2024.id);
+    const { db, periods, admin } = await seedEngineFixture();
+    await closePeriodAction(db, periods.jan2024.id, admin.id);
 
-    const summary = await reopenPeriodAction(db, periods.jan2024.id, "Late correction requested by City Accountant");
+    const summary = await reopenPeriodAction(
+      db,
+      periods.jan2024.id,
+      "Late correction requested by City Accountant",
+      admin.id,
+    );
     expect(summary.status).toBe("open");
     expect(summary.periodId).toBe(periods.jan2024.id);
   });
 
-  it("attributes the reopen to the placeholder user and logs the reason (D32, D22)", async () => {
-    const { db, periods } = await fixture();
-    await closePeriodAction(db, periods.jan2024.id);
-    await reopenPeriodAction(db, periods.jan2024.id, "Late correction requested by City Accountant");
+  it("attributes the reopen to whoever reopened it and logs the reason (T-018, D22)", async () => {
+    const { db, periods, admin } = await seedEngineFixture();
+    await closePeriodAction(db, periods.jan2024.id, admin.id);
+    await reopenPeriodAction(db, periods.jan2024.id, "Late correction requested by City Accountant", admin.id);
 
-    const placeholder = await db.query
-      .select({ id: appUser.id })
-      .from(appUser)
-      .where(eq(appUser.username, PLACEHOLDER_USER_USERNAME))
-      .get();
     const logs = await db.query.select().from(auditLog).where(eq(auditLog.action, "period.reopen")).all();
     expect(logs).toHaveLength(1);
-    expect(logs[0].userId).toBe(placeholder?.id);
+    expect(logs[0].userId).toBe(admin.id);
     expect(logs[0].afterJson).toContain("Late correction requested by City Accountant");
   });
 
   it("passes through the engine's refusal of a blank reason", async () => {
-    const { db, periods } = await fixture();
-    await closePeriodAction(db, periods.jan2024.id);
+    const { db, periods, admin } = await seedEngineFixture();
+    await closePeriodAction(db, periods.jan2024.id, admin.id);
 
-    await expect(reopenPeriodAction(db, periods.jan2024.id, "")).rejects.toThrow(InvalidStatusError);
-    await expect(reopenPeriodAction(db, periods.jan2024.id, "   ")).rejects.toThrow(InvalidStatusError);
+    await expect(reopenPeriodAction(db, periods.jan2024.id, "", admin.id)).rejects.toThrow(InvalidStatusError);
+    await expect(reopenPeriodAction(db, periods.jan2024.id, "   ", admin.id)).rejects.toThrow(InvalidStatusError);
 
     // Still closed — the refused attempts wrote nothing.
     const row = await db.query.select().from(accountingPeriod).where(eq(accountingPeriod.id, periods.jan2024.id)).get();

@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # eBarangay Books
 
 ## 1. What this project does
@@ -25,32 +29,52 @@ ebarangay-books/
 │   ├── db/
 │   │   ├── schema.ts        13 tables — the source of truth for data shape
 │   │   ├── seed/            54 PSGC barangays, 46-account chart, users
-│   │   ├── adapter.ts       Tauri ⇄ better-sqlite3 boundary
+│   │   ├── adapter.ts       the EngineDb seam: Drizzle query + writeBatch (D30)
+│   │   ├── appDb.ts         real adapter — SQLite via Tauri IPC
+│   │   ├── testDb.ts        test adapter — same Drizzle proxy driver, in-memory better-sqlite3
 │   │   ├── guards.ts        invariant enforcement
 │   │   └── bootstrap.ts     first-run database creation
 │   ├── lib/
-│   │   ├── engine/          posting, periods, void/reversal, numbering, audit
-│   │   ├── reports/         trial balance, general ledger — pure functions
-│   │   ├── queries/         read paths: accounts, barangays, journal, periods
+│   │   ├── engine/          one file per write path (post, void, period,
+│   │   │                    numbering, accountsAdmin, advances, bankReconciliation,
+│   │   │                    fixedAssets, signatories, users, audit) — all writes
+│   │   │                    go through here, never a screen calling Drizzle directly
+│   │   ├── reports/         trial balance, general ledger, and one file per printed
+│   │   │                    report — pure functions over journal_entry_line
+│   │   ├── queries/         read paths, one file per domain, mirroring engine/
+│   │   ├── *Form.ts         one client-side validation module per write screen
+│   │   │                    (accountAdminForm, advanceForm, userForm, etc.) —
+│   │   │                    the pattern any new data-entry screen should follow
 │   │   ├── money.ts         THE money boundary — centavos in, string out
 │   │   ├── voucher.ts       voucher balance math
 │   │   └── calendar.ts      period and date helpers
-│   ├── screens/             SelectRecords · JournalVoucher · Reports
+│   ├── screens/             one screen + its .css per module (JournalVoucher,
+│   │                        Reports, Advances, FixedAssets, BankReconciliation,
+│   │                        ChartOfAccountsAdmin, Signatories, UserAdmin,
+│   │                        FirstRunSetup, WhoIsWorking, SelectRecords)
 │   ├── components/          AppShell, Card, Button, Badge, Select, TextField
 │   └── styles/tokens.css    design tokens
 ├── src-tauri/               Rust shell, transaction bridge, capabilities
-├── drizzle/                 generated migrations
+├── drizzle/                 generated migrations — SQLite triggers enforcing
+│                            append-only tables live in these .sql files
 ├── e2e/drive.py             WebDriver harness (debug builds only — see D33)
 ├── docs/decisions.md        D1–D33, binding client decisions
 ├── scripts/sync-barangays.ts
 └── SYSTEM_FLOW.md           build order, what's done, and what's left
 ```
 
+Every write path follows the same three-layer shape: a screen calls a
+**query** function for reads, which calls an **engine** function for writes,
+which returns typed errors from `src/lib/engine/errors.ts` that the screen
+maps to a message via `src/lib/errorMessage.ts`. Client-side validation
+before a write reaches the engine lives in a `src/lib/<domain>Form.ts` module.
+New data-entry work should follow this shape rather than inventing one.
+
 **Read these before touching their area:**
 
 | Path | Why |
 |---|---|
-| `SYSTEM_FLOW.md` | The single progress record: what's done (Phases 1–3.6, T-001–T-010, all Reviewer-PASSed), what's left (3.7 onward), and open risks/deferred items. **Read this first, every session** — it's what lets a session with no memory of the last one continue correctly. |
+| `SYSTEM_FLOW.md` | The single progress record: "Right now" for the latest completed task, "Remaining work" for the backlog, "Deferred"/"Open risks" for things already decided or flagged. **Read this first, every session** — it's what lets a session with no memory of the last one continue correctly. |
 | `docs/decisions.md` | D1–D33 are binding decisions made with the client. Not suggestions. Cite the D-number when one applies. |
 | `src/lib/money.ts` | The only place peso ⇄ centavo conversion is allowed to happen. |
 | `src/db/schema.ts` | 13 tables. Triggers here enforce immutability at the database level. |
@@ -68,7 +92,7 @@ npm run tauri dev        # the real desktop app
 npm run build            # tsc -b && vite build
 npx tsc --noEmit         # typecheck
 npm run lint             # oxlint
-npx vitest run           # 281 passing / 25 files at T-010 baseline
+npx vitest run           # must stay 100% green — see SYSTEM_FLOW.md for the current pass count
 npm run db:generate      # drizzle-kit generate
 cd src-tauri && cargo check    # if any Rust was touched
 ```

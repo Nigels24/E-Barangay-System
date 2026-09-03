@@ -19,7 +19,6 @@ import { createDraftEntry, postEntry, type DraftLineInput } from "../engine/post
 import { voidEntry } from "../engine/void";
 import type { EngineDb } from "../engine/types";
 import { sumCentavos } from "../money";
-import { requirePostingUserId } from "./users";
 
 /** One posted or drafted line, joined to the account it hits. */
 export interface VoucherLine {
@@ -226,16 +225,15 @@ export interface PostedVoucher {
  * than hide that, the draft is left in place, `listPeriodVouchers` shows it,
  * and {@link VoucherNotPostedError} names it.
  *
- * The user is resolved here rather than passed in, so that no screen can
- * attribute an entry to the wrong actor by accident — there is exactly one
- * answer today (D32) and exactly one place that decides it.
+ * `actorUserId` is the current session's user (T-018/D24) — the screen
+ * that calls this already knows who is working, from the who's-working
+ * picker in `App.tsx`.
  */
 export async function postNewVoucher(
   db: EngineDb,
   input: NewVoucherInput,
+  actorUserId: number,
 ): Promise<PostedVoucher> {
-  const userId = await requirePostingUserId(db);
-
   const draft = await createDraftEntry(db, {
     barangayId: input.barangayId,
     periodId: input.periodId,
@@ -247,12 +245,12 @@ export async function postNewVoucher(
     checkNo: input.checkNo?.trim() || undefined,
     checkDate: input.checkDate?.trim() || undefined,
     lines: input.lines,
-    createdBy: userId,
+    createdBy: actorUserId,
   });
 
   let posted;
   try {
-    posted = await postEntry(db, { entryId: draft.id, postedBy: userId });
+    posted = await postEntry(db, { entryId: draft.id, postedBy: actorUserId });
   } catch (error: unknown) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new VoucherNotPostedError(
@@ -286,18 +284,16 @@ export interface VoidVoucherInput {
  * Voids a posted voucher and posts its reversal, as one call from the
  * screen's point of view.
  *
- * The user is resolved here, not passed in, for the same reason
- * {@link postNewVoucher} resolves it — there is exactly one answer today
- * (D32) and exactly one place that decides it. Everything else — the
- * reversal's swapped lines, its own JEV number, the atomic batch — is
- * `voidEntry`'s job; this is the seam, not a second copy of the logic.
+ * `actorUserId` is the current session's user (T-018/D24), same as
+ * {@link postNewVoucher}. Everything else — the reversal's swapped lines,
+ * its own JEV number, the atomic batch — is `voidEntry`'s job; this is the
+ * seam, not a second copy of the logic.
  */
-export async function voidPostedVoucher(db: EngineDb, input: VoidVoucherInput) {
-  const userId = await requirePostingUserId(db);
+export async function voidPostedVoucher(db: EngineDb, input: VoidVoucherInput, actorUserId: number) {
   return voidEntry(db, {
     entryId: input.entryId,
     reason: input.reason,
-    voidedBy: userId,
+    voidedBy: actorUserId,
     reversalDate: input.reversalDate,
     reversalPeriodId: input.periodId,
   });

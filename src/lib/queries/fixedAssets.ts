@@ -9,7 +9,6 @@ import { and, asc, eq, like, notLike } from "drizzle-orm";
 import { account, fixedAsset } from "../../db/schema";
 import { disposeFixedAsset, recordFixedAsset } from "../engine/fixedAssets";
 import type { EngineDb } from "../engine/types";
-import { requirePostingUserId } from "./users";
 
 /** Just enough of an account to populate the "link to an account" picker. */
 export interface FixedAssetAccountOption {
@@ -123,14 +122,17 @@ export interface NewFixedAssetInput {
 }
 
 /**
- * Adds an asset to the register. The actor is resolved here (D32), same as
- * every other write in the app. Returns the same joined shape
- * {@link listFixedAssets} does, not the engine's bare row, so a screen has
- * one shape to render regardless of whether it just wrote or just read.
+ * Adds an asset to the register. `actorUserId` is the current session's
+ * user (T-018/D24). Returns the same joined shape {@link listFixedAssets}
+ * does, not the engine's bare row, so a screen has one shape to render
+ * regardless of whether it just wrote or just read.
  */
-export async function createFixedAssetAction(db: EngineDb, input: NewFixedAssetInput): Promise<FixedAssetRecord> {
-  const userId = await requirePostingUserId(db);
-  const asset = await recordFixedAsset(db, { ...input, recordedBy: userId });
+export async function createFixedAssetAction(
+  db: EngineDb,
+  input: NewFixedAssetInput,
+  actorUserId: number,
+): Promise<FixedAssetRecord> {
+  const asset = await recordFixedAsset(db, { ...input, recordedBy: actorUserId });
   return getFixedAsset(db, asset.id);
 }
 
@@ -139,12 +141,12 @@ export interface DisposeFixedAssetActionInput {
   disposalDate: string;
 }
 
-/** Records an asset's disposal. The actor is resolved here (D32), same as every other write in the app. */
+/** Records an asset's disposal. `actorUserId` is the current session's user (T-018/D24). */
 export async function disposeFixedAssetAction(
   db: EngineDb,
   input: DisposeFixedAssetActionInput,
+  actorUserId: number,
 ): Promise<FixedAssetRecord> {
-  const userId = await requirePostingUserId(db);
-  const asset = await disposeFixedAsset(db, { ...input, disposedBy: userId });
+  const asset = await disposeFixedAsset(db, { ...input, disposedBy: actorUserId });
   return getFixedAsset(db, asset.id);
 }

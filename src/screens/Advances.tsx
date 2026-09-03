@@ -27,6 +27,8 @@ interface AdvancesProps {
   db: EngineDb;
   barangayId: number;
   barangayName: string;
+  /** The current session's user (T-018/D24) — every write here attributes to them. */
+  currentUserId: number;
   onBack: () => void;
   onViewSchedule: () => void;
 }
@@ -42,7 +44,7 @@ interface AdvancesProps {
  * on `Reports.tsx`, same composition/print split every other screen in this
  * app keeps.
  */
-export function Advances({ db, barangayId, barangayName, onBack, onViewSchedule }: AdvancesProps) {
+export function Advances({ db, barangayId, barangayName, currentUserId, onBack, onViewSchedule }: AdvancesProps) {
   const [advances, setAdvances] = useState<AdvanceRecord[] | null>(null);
   const [advancesError, setAdvancesError] = useState<string | null>(null);
 
@@ -90,7 +92,7 @@ export function Advances({ db, barangayId, barangayName, onBack, onViewSchedule 
     setSaving(true);
     setSaveError(null);
     try {
-      const advance = await createAdvanceAction(db, toNewAdvanceInput(form, barangayId));
+      const advance = await createAdvanceAction(db, toNewAdvanceInput(form, barangayId), currentUserId);
       setLastSaved(advance);
       setForm(emptyAdvanceForm(new Date().toISOString().slice(0, 10)));
       await reloadAdvances();
@@ -118,10 +120,14 @@ export function Advances({ db, barangayId, barangayName, onBack, onViewSchedule 
     setLiquidating(true);
     setLiquidateError(null);
     try {
-      await liquidateAdvanceAction(db, {
-        advanceId: liquidatingAdvanceId,
-        amountCentavos: toLiquidationCentavos(liquidateAmount),
-      });
+      await liquidateAdvanceAction(
+        db,
+        {
+          advanceId: liquidatingAdvanceId,
+          amountCentavos: toLiquidationCentavos(liquidateAmount),
+        },
+        currentUserId,
+      );
       cancelLiquidate();
       await reloadAdvances();
     } catch (error: unknown) {

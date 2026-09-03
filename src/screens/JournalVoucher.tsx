@@ -17,9 +17,10 @@ import {
   PlusIcon,
   SignatureIcon,
   TrashIcon,
+  UsersIcon,
   WalletIcon,
 } from "../components/icons";
-import type { JournalBook, JournalEntryStatus, PeriodStatus } from "../db/schema";
+import type { JournalBook, JournalEntryStatus, PeriodStatus, UserRole } from "../db/schema";
 import {
   defaultDateInPeriod,
   formatPeriodLabel,
@@ -79,6 +80,10 @@ interface JournalVoucherProps {
   year: number;
   month: number;
   status: PeriodStatus;
+  /** The current session's user (T-018/D24) — every write here attributes to them. */
+  currentUserId: number;
+  /** Gates the Chart of accounts / Manage users links — both Administrator-only (D24). */
+  currentUserRole: UserRole;
   onBack: () => void;
   onViewReports: () => void;
   onOpenFixedAssets: () => void;
@@ -86,6 +91,7 @@ interface JournalVoucherProps {
   onOpenBankReconciliation: () => void;
   onOpenSignatories: () => void;
   onOpenChartOfAccounts: () => void;
+  onOpenUserAdmin: () => void;
 }
 
 /**
@@ -105,6 +111,8 @@ export function JournalVoucher({
   year,
   month,
   status,
+  currentUserId,
+  currentUserRole,
   onBack,
   onViewReports,
   onOpenFixedAssets,
@@ -112,6 +120,7 @@ export function JournalVoucher({
   onOpenBankReconciliation,
   onOpenSignatories,
   onOpenChartOfAccounts,
+  onOpenUserAdmin,
 }: JournalVoucherProps) {
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
   const [accountsError, setAccountsError] = useState<string | null>(null);
@@ -228,16 +237,20 @@ export function JournalVoucher({
     setPostError(null);
     try {
       const draftLines = toDraftLines(lines);
-      const result = await postNewVoucher(db, {
-        barangayId,
-        periodId,
-        entryDate: header.entryDate,
-        book: header.book,
-        particulars: header.particulars,
-        checkNo: header.checkNo,
-        checkDate: header.checkDate,
-        lines: draftLines,
-      });
+      const result = await postNewVoucher(
+        db,
+        {
+          barangayId,
+          periodId,
+          entryDate: header.entryDate,
+          book: header.book,
+          particulars: header.particulars,
+          checkNo: header.checkNo,
+          checkDate: header.checkDate,
+          lines: draftLines,
+        },
+        currentUserId,
+      );
       setLastPosted(result);
       setHeader(emptyHeader(periodStartDate(year, month)));
       setLines([emptyLine(newLineKey()), emptyLine(newLineKey())]);
@@ -270,12 +283,16 @@ export function JournalVoucher({
     setVoiding(true);
     setVoidError(null);
     try {
-      await voidPostedVoucher(db, {
-        entryId: voidingEntryId,
-        reason: voidReason,
-        reversalDate: voidReversalDate,
-        periodId,
-      });
+      await voidPostedVoucher(
+        db,
+        {
+          entryId: voidingEntryId,
+          reason: voidReason,
+          reversalDate: voidReversalDate,
+          periodId,
+        },
+        currentUserId,
+      );
       cancelVoid();
       await reloadVouchers();
     } catch (error: unknown) {
@@ -342,9 +359,16 @@ export function JournalVoucher({
           <Button variant="ghost" size="sm" onClick={onOpenSignatories}>
             <SignatureIcon size={14} /> Signatories
           </Button>
-          <Button variant="ghost" size="sm" onClick={onOpenChartOfAccounts}>
-            <ListIcon size={14} /> Chart of accounts
-          </Button>
+          {currentUserRole === "admin" ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={onOpenChartOfAccounts}>
+                <ListIcon size={14} /> Chart of accounts
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onOpenUserAdmin}>
+                <UsersIcon size={14} /> Manage users
+              </Button>
+            </>
+          ) : null}
         </div>
       </div>
 

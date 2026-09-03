@@ -23,6 +23,8 @@ interface SignatoriesProps {
   db: EngineDb;
   barangayId: number;
   barangayName: string;
+  /** The current session's user (T-018/D24) — every write here attributes to them. */
+  currentUserId: number;
   onBack: () => void;
 }
 
@@ -37,7 +39,7 @@ interface SignatoriesProps {
  * of" that report's own date — see `reports/signatories.ts` and
  * `Reports.tsx`'s `SignatureBlock`.
  */
-export function Signatories({ db, barangayId, barangayName, onBack }: SignatoriesProps) {
+export function Signatories({ db, barangayId, barangayName, currentUserId, onBack }: SignatoriesProps) {
   const [signatories, setSignatories] = useState<SignatoryRecord[] | null>(null);
   const [signatoriesError, setSignatoriesError] = useState<string | null>(null);
 
@@ -80,7 +82,7 @@ export function Signatories({ db, barangayId, barangayName, onBack }: Signatorie
     setSaving(true);
     setSaveError(null);
     try {
-      const created = await createSignatoryAction(db, toNewSignatoryInput(form, barangayId));
+      const created = await createSignatoryAction(db, toNewSignatoryInput(form, barangayId), currentUserId);
       setLastSaved(created);
       setForm(emptySignatoryForm(new Date().toISOString().slice(0, 10)));
       await reloadSignatories();

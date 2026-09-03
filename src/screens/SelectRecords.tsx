@@ -8,7 +8,7 @@ import { BuildingIcon, CalendarDaysIcon, CalendarIcon } from "../components/icon
 import { MONTHS, formatPeriodLabel, selectableYears } from "../lib/calendar";
 import { errorMessage } from "../lib/errorMessage";
 import type { EngineDb } from "../lib/engine/types";
-import type { PeriodStatus } from "../db/schema";
+import type { PeriodStatus, UserRole } from "../db/schema";
 import { listBarangays, type BarangayOption } from "../lib/queries/barangays";
 import {
   closePeriodAction,
@@ -47,6 +47,8 @@ export interface OpenedBooks {
 
 export function SelectRecords({
   db,
+  currentUserId,
+  currentUserRole,
   onOpenBooks,
   onViewReports,
   onOpenFixedAssets,
@@ -54,8 +56,13 @@ export function SelectRecords({
   onOpenBankReconciliation,
   onOpenSignatories,
   onOpenChartOfAccounts,
+  onOpenUserAdmin,
 }: {
   db: EngineDb;
+  /** The current session's user (T-018/D24) — every write here attributes to them. */
+  currentUserId: number;
+  /** Gates the Chart of accounts / Manage users links — both Administrator-only (D24). */
+  currentUserRole: UserRole;
   onOpenBooks: (opened: OpenedBooks) => void;
   onViewReports: (opened: OpenedBooks) => void;
   onOpenFixedAssets: (opened: OpenedBooks) => void;
@@ -63,6 +70,7 @@ export function SelectRecords({
   onOpenBankReconciliation: (opened: OpenedBooks) => void;
   onOpenSignatories: (opened: OpenedBooks) => void;
   onOpenChartOfAccounts: () => void;
+  onOpenUserAdmin: () => void;
 }) {
   const [barangays, setBarangays] = useState<BarangayOption[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -151,7 +159,7 @@ export function SelectRecords({
     setClosing(true);
     setCloseError(null);
     try {
-      setSummary(await closePeriodAction(db, summary.periodId));
+      setSummary(await closePeriodAction(db, summary.periodId, currentUserId));
       setCloseConfirming(false);
     } catch (error: unknown) {
       setCloseError(errorMessage(error));
@@ -165,7 +173,7 @@ export function SelectRecords({
     setReopening(true);
     setReopenError(null);
     try {
-      setSummary(await reopenPeriodAction(db, summary.periodId, reopenReason));
+      setSummary(await reopenPeriodAction(db, summary.periodId, reopenReason, currentUserId));
       setReopenConfirming(false);
       setReopenReason("");
     } catch (error: unknown) {
@@ -202,11 +210,16 @@ export function SelectRecords({
 
   return (
     <>
-      <div className="select-header">
-        <Button variant="ghost" size="sm" onClick={onOpenChartOfAccounts}>
-          Chart of accounts
-        </Button>
-      </div>
+      {currentUserRole === "admin" ? (
+        <div className="select-header">
+          <Button variant="ghost" size="sm" onClick={onOpenChartOfAccounts}>
+            Chart of accounts
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenUserAdmin}>
+            Manage users
+          </Button>
+        </div>
+      ) : null}
 
       <Card title="Select records" subtitle="Choose a barangay, year and month to open its books.">
         <div className="field-row">

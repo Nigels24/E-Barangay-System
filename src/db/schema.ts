@@ -467,7 +467,17 @@ export const appUser = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     username: text("username").notNull().unique(),
-    passwordHash: text("password_hash").notNull(),
+    /**
+     * Nullable (D24/T-018): login here is a name/role picker, not a
+     * password — the office shares one PC and a password checked against
+     * nobody in particular buys no real security, only friction. The
+     * column stays, unused, rather than being dropped: it costs nothing to
+     * keep, and a future password-based login would want it back. The one
+     * historical row that ever had a value here (the D32 placeholder
+     * actor) keeps it — D11 never relabels a historical record, even
+     * cosmetically.
+     */
+    passwordHash: text("password_hash"),
     fullName: text("full_name").notNull(),
     position: text("position"),
     role: text("role").$type<UserRole>().notNull(),

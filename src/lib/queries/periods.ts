@@ -14,7 +14,6 @@ import { count, eq } from "drizzle-orm";
 import { journalEntry, type PeriodStatus } from "../../db/schema";
 import { closePeriod, ensurePeriod, reopenPeriod } from "../engine/period";
 import type { EngineDb } from "../engine/types";
-import { requirePostingUserId } from "./users";
 
 /** A period plus the one number a picker screen shows about it. */
 export interface PeriodSummary {
@@ -108,13 +107,12 @@ export async function openPeriodSummary(
 }
 
 /**
- * Closes an open period from a screen. The actor is resolved the same way
- * every other write in the app resolves it (D32) — a screen never passes an
- * id, so it can never attribute the close to the wrong actor.
+ * Closes an open period from a screen. `actorUserId` is the current
+ * session's user (T-018/D24) — the screen already knows who is working,
+ * from the who's-working picker in `App.tsx`.
  */
-export async function closePeriodAction(db: EngineDb, periodId: number): Promise<PeriodSummary> {
-  const userId = await requirePostingUserId(db);
-  const period = await closePeriod(db, periodId, userId);
+export async function closePeriodAction(db: EngineDb, periodId: number, actorUserId: number): Promise<PeriodSummary> {
+  const period = await closePeriod(db, periodId, actorUserId);
   return toSummary(db, period);
 }
 
@@ -127,8 +125,8 @@ export async function reopenPeriodAction(
   db: EngineDb,
   periodId: number,
   reason: string,
+  actorUserId: number,
 ): Promise<PeriodSummary> {
-  const userId = await requirePostingUserId(db);
-  const period = await reopenPeriod(db, periodId, userId, reason);
+  const period = await reopenPeriod(db, periodId, actorUserId, reason);
   return toSummary(db, period);
 }

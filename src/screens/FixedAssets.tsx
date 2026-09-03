@@ -29,6 +29,8 @@ interface FixedAssetsProps {
   db: EngineDb;
   barangayId: number;
   barangayName: string;
+  /** The current session's user (T-018/D24) — every write here attributes to them. */
+  currentUserId: number;
   onBack: () => void;
   onViewSchedule: () => void;
 }
@@ -42,7 +44,7 @@ interface FixedAssetsProps {
  * register back "as of" a month lives on `Reports.tsx`, same split as every
  * other entry screen in this app keeping composition separate from print.
  */
-export function FixedAssets({ db, barangayId, barangayName, onBack, onViewSchedule }: FixedAssetsProps) {
+export function FixedAssets({ db, barangayId, barangayName, currentUserId, onBack, onViewSchedule }: FixedAssetsProps) {
   const [accounts, setAccounts] = useState<FixedAssetAccountOption[] | null>(null);
   const [accountsError, setAccountsError] = useState<string | null>(null);
 
@@ -108,7 +110,7 @@ export function FixedAssets({ db, barangayId, barangayName, onBack, onViewSchedu
     setSaving(true);
     setSaveError(null);
     try {
-      const asset = await createFixedAssetAction(db, toNewFixedAssetInput(form, barangayId));
+      const asset = await createFixedAssetAction(db, toNewFixedAssetInput(form, barangayId), currentUserId);
       setLastSaved(asset);
       setForm(emptyFixedAssetForm());
       await reloadAssets();
@@ -139,7 +141,7 @@ export function FixedAssets({ db, barangayId, barangayName, onBack, onViewSchedu
     setDisposing(true);
     setDisposeError(null);
     try {
-      await disposeFixedAssetAction(db, { assetId: disposingAssetId, disposalDate: disposeDate });
+      await disposeFixedAssetAction(db, { assetId: disposingAssetId, disposalDate: disposeDate }, currentUserId);
       cancelDispose();
       await reloadAssets();
     } catch (error: unknown) {

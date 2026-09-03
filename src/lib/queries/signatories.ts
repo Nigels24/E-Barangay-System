@@ -11,7 +11,6 @@ import { asc, eq } from "drizzle-orm";
 import { signatory, type SignatoryRole } from "../../db/schema";
 import { recordSignatory } from "../engine/signatories";
 import type { EngineDb } from "../engine/types";
-import { requirePostingUserId } from "./users";
 
 export interface SignatoryRecord {
   id: number;
@@ -40,8 +39,11 @@ export interface NewSignatoryInput {
   effectiveFrom: string;
 }
 
-/** Adds a signatory. The actor is resolved here (D32), same as every other write in the app. */
-export async function createSignatoryAction(db: EngineDb, input: NewSignatoryInput): Promise<SignatoryRecord> {
-  const userId = await requirePostingUserId(db);
-  return recordSignatory(db, { ...input, recordedBy: userId });
+/** Adds a signatory. `actorUserId` is the current session's user (T-018/D24). */
+export async function createSignatoryAction(
+  db: EngineDb,
+  input: NewSignatoryInput,
+  actorUserId: number,
+): Promise<SignatoryRecord> {
+  return recordSignatory(db, { ...input, recordedBy: actorUserId });
 }

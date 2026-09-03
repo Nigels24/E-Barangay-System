@@ -56,6 +56,8 @@ interface BankReconciliationProps {
   periodId: number;
   year: number;
   month: number;
+  /** The current session's user (T-018/D24) — every write here attributes to them. */
+  currentUserId: number;
   onBack: () => void;
   onViewStatement: () => void;
 }
@@ -76,6 +78,7 @@ export function BankReconciliation({
   periodId,
   year,
   month,
+  currentUserId,
   onBack,
   onViewStatement,
 }: BankReconciliationProps) {
@@ -144,7 +147,7 @@ export function BankReconciliation({
     setSavingAccount(true);
     setSaveAccountError(null);
     try {
-      const created = await createBankAccountAction(db, toNewBankAccountInput(addForm, barangayId));
+      const created = await createBankAccountAction(db, toNewBankAccountInput(addForm, barangayId), currentUserId);
       setLastSavedAccount(created);
       setAddForm(emptyBankAccountForm());
       await reloadBankAccounts();
@@ -257,6 +260,7 @@ export function BankReconciliation({
           periodId={periodId}
           year={year}
           month={month}
+          currentUserId={currentUserId}
           bankAccount={selectedBankAccount}
         />
       ) : null}
@@ -277,6 +281,7 @@ function ReconciliationWorksheetSection({
   periodId,
   year,
   month,
+  currentUserId,
   bankAccount,
 }: {
   db: EngineDb;
@@ -284,6 +289,7 @@ function ReconciliationWorksheetSection({
   periodId: number;
   year: number;
   month: number;
+  currentUserId: number;
   bankAccount: BankAccountRecord;
 }) {
   const context: WorksheetContext = {
@@ -390,11 +396,15 @@ function ReconciliationWorksheetSection({
     setStarting(true);
     setStartError(null);
     try {
-      const created = await startReconciliationAction(db, {
-        context,
-        statementDate: startForm.statementDate,
-        statementBalanceCentavos: toReconciliationHeaderCentavos(startForm),
-      });
+      const created = await startReconciliationAction(
+        db,
+        {
+          context,
+          statementDate: startForm.statementDate,
+          statementBalanceCentavos: toReconciliationHeaderCentavos(startForm),
+        },
+        currentUserId,
+      );
       setWorksheet(created);
     } catch (error: unknown) {
       setStartError(errorMessage(error));
@@ -418,12 +428,16 @@ function ReconciliationWorksheetSection({
     setSavingHeader(true);
     setHeaderError(null);
     try {
-      const updated = await updateReconciliationHeaderAction(db, {
-        context,
-        reconciliationId: worksheet.reconciliation.id,
-        statementDate: headerForm.statementDate,
-        statementBalanceCentavos: toReconciliationHeaderCentavos(headerForm),
-      });
+      const updated = await updateReconciliationHeaderAction(
+        db,
+        {
+          context,
+          reconciliationId: worksheet.reconciliation.id,
+          statementDate: headerForm.statementDate,
+          statementBalanceCentavos: toReconciliationHeaderCentavos(headerForm),
+        },
+        currentUserId,
+      );
       setWorksheet(updated);
       setEditingHeader(false);
     } catch (error: unknown) {
@@ -449,7 +463,11 @@ function ReconciliationWorksheetSection({
     setAddingItem(true);
     setAddItemError(null);
     try {
-      const updated = await addReconcilingItemAction(db, { context, reconciliationId: worksheet.reconciliation.id, ...toNewReconcilingItemInput(itemForm) });
+      const updated = await addReconcilingItemAction(
+        db,
+        { context, reconciliationId: worksheet.reconciliation.id, ...toNewReconcilingItemInput(itemForm) },
+        currentUserId,
+      );
       setWorksheet(updated);
       setItemForm(emptyReconcilingItemForm());
     } catch (error: unknown) {
@@ -464,15 +482,19 @@ function ReconciliationWorksheetSection({
     setAddingCheckEntryId(check.entryId);
     setChecksError(null);
     try {
-      const updated = await addReconcilingItemAction(db, {
-        context,
-        reconciliationId: worksheet.reconciliation.id,
-        side: "bank",
-        itemType: "checks_issued_not_taken_up",
-        amountCentavos: -check.amountCentavos,
-        explanation: `Check #${check.checkNo}, issued ${check.checkDate}${check.jevNo ? ` (${check.jevNo})` : ""}`,
-        relatedEntryId: check.entryId,
-      });
+      const updated = await addReconcilingItemAction(
+        db,
+        {
+          context,
+          reconciliationId: worksheet.reconciliation.id,
+          side: "bank",
+          itemType: "checks_issued_not_taken_up",
+          amountCentavos: -check.amountCentavos,
+          explanation: `Check #${check.checkNo}, issued ${check.checkDate}${check.jevNo ? ` (${check.jevNo})` : ""}`,
+          relatedEntryId: check.entryId,
+        },
+        currentUserId,
+      );
       setWorksheet(updated);
       await reloadChecks(worksheet.reconciliation.statementDate);
     } catch (error: unknown) {
@@ -493,7 +515,7 @@ function ReconciliationWorksheetSection({
     setClearBusy(true);
     setClearError(null);
     try {
-      await markCheckClearedAction(db, { entryId: clearingEntryId, clearedDate: clearDate });
+      await markCheckClearedAction(db, { entryId: clearingEntryId, clearedDate: clearDate }, currentUserId);
       setClearingEntryId(null);
       setClearDate("");
       await reloadChecks(worksheet.reconciliation.statementDate);
@@ -523,14 +545,18 @@ function ReconciliationWorksheetSection({
     setPostingAdjustment(true);
     setAdjustError(null);
     try {
-      const { worksheet: updated, posted } = await postAdjustingEntryAction(db, {
-        context,
-        reconcilingItemId: item.id,
-        itemAmountCentavos: item.amountCentavos,
-        entryDate: worksheet.reconciliation.statementDate,
-        particulars: adjustForm.particulars,
-        offsetAccountId: Number(adjustForm.offsetAccountId),
-      });
+      const { worksheet: updated, posted } = await postAdjustingEntryAction(
+        db,
+        {
+          context,
+          reconcilingItemId: item.id,
+          itemAmountCentavos: item.amountCentavos,
+          entryDate: worksheet.reconciliation.statementDate,
+          particulars: adjustForm.particulars,
+          offsetAccountId: Number(adjustForm.offsetAccountId),
+        },
+        currentUserId,
+      );
       setWorksheet(updated);
       setLastAdjustment(`Posted as ${posted.jevNo}.`);
       setAdjustingItemId(null);
@@ -546,11 +572,15 @@ function ReconciliationWorksheetSection({
     setFinalizing(true);
     setFinalizeError(null);
     try {
-      const updated = await finalizeReconciliationAction(db, {
-        context,
-        reconciliationId: worksheet.reconciliation.id,
-        varianceOverrideReason: worksheet.varianceCentavos !== 0 ? overrideReason : undefined,
-      });
+      const updated = await finalizeReconciliationAction(
+        db,
+        {
+          context,
+          reconciliationId: worksheet.reconciliation.id,
+          varianceOverrideReason: worksheet.varianceCentavos !== 0 ? overrideReason : undefined,
+        },
+        currentUserId,
+      );
       setWorksheet(updated);
       setFinalizeConfirming(false);
       setOverrideReason("");

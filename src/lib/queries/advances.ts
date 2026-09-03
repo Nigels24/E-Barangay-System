@@ -9,7 +9,6 @@ import { asc, eq } from "drizzle-orm";
 import { advanceToOfficer, type AdvanceStatus } from "../../db/schema";
 import { liquidateAdvance, recordAdvance } from "../engine/advances";
 import type { EngineDb } from "../engine/types";
-import { requirePostingUserId } from "./users";
 
 /** One advance in the register, granted or fully/partially liquidated. */
 export interface AdvanceRecord {
@@ -50,10 +49,13 @@ export interface NewAdvanceInput {
   sourceEntryId?: number;
 }
 
-/** Grants an advance. The actor is resolved here (D32), same as every other write in the app. */
-export async function createAdvanceAction(db: EngineDb, input: NewAdvanceInput): Promise<AdvanceRecord> {
-  const userId = await requirePostingUserId(db);
-  const advance = await recordAdvance(db, { ...input, recordedBy: userId });
+/** Grants an advance. `actorUserId` is the current session's user (T-018/D24). */
+export async function createAdvanceAction(
+  db: EngineDb,
+  input: NewAdvanceInput,
+  actorUserId: number,
+): Promise<AdvanceRecord> {
+  const advance = await recordAdvance(db, { ...input, recordedBy: actorUserId });
   return getAdvance(db, advance.id);
 }
 
@@ -62,12 +64,12 @@ export interface LiquidateAdvanceActionInput {
   amountCentavos: number;
 }
 
-/** Records a liquidation, in full or in part. The actor is resolved here (D32). */
+/** Records a liquidation, in full or in part. `actorUserId` is the current session's user (T-018/D24). */
 export async function liquidateAdvanceAction(
   db: EngineDb,
   input: LiquidateAdvanceActionInput,
+  actorUserId: number,
 ): Promise<AdvanceRecord> {
-  const userId = await requirePostingUserId(db);
-  const advance = await liquidateAdvance(db, { ...input, liquidatedBy: userId });
+  const advance = await liquidateAdvance(db, { ...input, liquidatedBy: actorUserId });
   return getAdvance(db, advance.id);
 }

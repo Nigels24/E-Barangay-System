@@ -3,6 +3,7 @@
 .select-header {
   display: flex;
   justify-content: flex-end;
+  gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
 

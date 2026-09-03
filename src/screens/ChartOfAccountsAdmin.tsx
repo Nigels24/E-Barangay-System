@@ -17,6 +17,8 @@ import "./ChartOfAccountsAdmin.css";
 
 interface ChartOfAccountsAdminProps {
   db: EngineDb;
+  /** The current session's user (T-018/D24) — every write here attributes to them. `App.tsx` only reaches this screen for an Administrator. */
+  currentUserId: number;
   onBack: () => void;
 }
 
@@ -35,7 +37,7 @@ interface ChartOfAccountsAdminProps {
  * official government account codes from memory would be worse than not
  * having them.
  */
-export function ChartOfAccountsAdmin({ db, onBack }: ChartOfAccountsAdminProps) {
+export function ChartOfAccountsAdmin({ db, currentUserId, onBack }: ChartOfAccountsAdminProps) {
   const [accounts, setAccounts] = useState<AdminAccountRecord[] | null>(null);
   const [accountsError, setAccountsError] = useState<string | null>(null);
 
@@ -88,7 +90,7 @@ export function ChartOfAccountsAdmin({ db, onBack }: ChartOfAccountsAdminProps) 
     setResolving(true);
     setResolveError(null);
     try {
-      await resolveProvisionalCodeAction(db, { accountId: resolvingId, newCode });
+      await resolveProvisionalCodeAction(db, { accountId: resolvingId, newCode }, currentUserId);
       cancelResolve();
       await reloadAccounts();
     } catch (error: unknown) {
@@ -102,7 +104,7 @@ export function ChartOfAccountsAdmin({ db, onBack }: ChartOfAccountsAdminProps) 
     setTogglingId(acct.id);
     setToggleError(null);
     try {
-      await setAccountActiveAction(db, { accountId: acct.id, isActive: !acct.isActive });
+      await setAccountActiveAction(db, { accountId: acct.id, isActive: !acct.isActive }, currentUserId);
       await reloadAccounts();
     } catch (error: unknown) {
       setToggleError(errorMessage(error));
