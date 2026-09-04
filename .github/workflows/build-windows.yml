@@ -1,0 +1,95 @@
+# Builds the Windows installer for the City Accounting Office PC.
+#
+# This app is developed on macOS but targets 64-bit Windows 10 or later (D28).
+# Tauri compiles a native binary, so the installer cannot be produced on the
+# Mac at all — that is the whole reason this workflow exists. It runs on a
+# windows-latest runner and leaves the installers downloadable as a build
+# artifact, so one file can be handed to a non-technical user.
+#
+# Deliberately NOT code-signed. The installer is unsigned, and Windows
+# SmartScreen will warn about it on first run.
+
+name: Build Windows installer
+
+on:
+  # Run it by hand from the Actions tab.
+  workflow_dispatch:
+  # Tagging a version also publishes a GitHub Release with the installers.
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  # Needed only by the release step on a tag push; reads are all the rest needs.
+  contents: write
+
+jobs:
+  build:
+    name: Build installers on Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # Node 22, not 20: better-sqlite3@13 declares `engines.node >= 22`, and
+      # vite@8 / oxlint declare `^20.19.0 || >=22.12.0`. 22 is the only line
+      # satisfying all three, and it matches the version this project is
+      # developed against locally.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # Keyed on src-tauri, where the only Cargo workspace in this repo lives.
+      # A cold Tauri build compiles the whole dependency tree; this is the
+      # difference between a ~20 minute run and a ~5 minute one.
+      - name: Cache the Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # `bundle.targets` is "all" in tauri.conf.json, which on Windows means
+      # both the WiX .msi and the NSIS .exe. `beforeBuildCommand` runs
+      # `npm run build` (tsc -b && vite build) first, so the frontend is built
+      # here too — there is no separate build step above on purpose.
+      - name: Build the app and its installers
+        run: npm run tauri build
+
+      # The app version, for an artifact name a person can recognise. Read from
+      # tauri.conf.json rather than package.json: it is the one that names the
+      # installer files themselves (package.json is still 0.0.0).
+      - name: Read the app version
+        id: app
+        shell: bash
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ebarangay-books-windows-v${{ steps.app.outputs.version }}
+          path: |
+            src-tauri/target/release/bundle/msi/
+            src-tauri/target/release/bundle/nsis/
+          # A build that silently produces no installer should fail loudly
+          # rather than hand over an empty zip.
+          if-no-files-found: error
+
+      - name: Publish a release with the installers
+        # Tag pushes only. A manual run just leaves the artifact above.
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/msi/*
+            src-tauri/target/release/bundle/nsis/*
+          fail_on_unmatched_files: true
