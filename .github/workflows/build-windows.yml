@@ -53,8 +53,22 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # --ignore-scripts, because of better-sqlite3. It has no install script of
+      # its own, but it does have a binding.gyp, and npm's implicit rule for that
+      # is to run `node-gyp rebuild` — which fails on windows-latest, where
+      # node-gyp 11 cannot parse the Visual Studio 18 that runner ships.
+      #
+      # The compile was never needed: better-sqlite3 publishes prebuilt binaries
+      # in its tarball (prebuilds/win32-x64.node among them) and its own loader
+      # tries those BEFORE any node-gyp output. It is also test-only — the sole
+      # import is src/db/testDb.ts, and the shipped app reaches SQLite through
+      # the Rust side instead (tauri-plugin-sql + db_bridge, D30).
+      #
+      # Nothing else in the tree needs an install script: rolldown, lightningcss,
+      # @tauri-apps/cli and oxlint all ship their Windows binaries as optional
+      # platform dependencies, which npm installs without running anything.
       - name: Install npm dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # `bundle.targets` is "all" in tauri.conf.json, which on Windows means
       # both the WiX .msi and the NSIS .exe. `beforeBuildCommand` runs
