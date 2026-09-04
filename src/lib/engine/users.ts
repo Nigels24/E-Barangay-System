@@ -1,12 +1,16 @@
 /**
  * Real users (D24/T-018): creating one, and activating/deactivating one.
  *
- * Login in this app is a name/role picker, never a password (see
- * schema.ts's own comment on `app_user.passwordHash`) — one shared office
- * PC, and a password checked against nobody in particular buys no real
- * security. What this module guarantees is the same thing every other
- * write in the engine guarantees: an audit-logged, single-transaction
- * write (D30).
+ * Login in this app is a name/role picker, never a password (D24) — one
+ * shared office PC, and a password checked against nobody in particular
+ * buys no real security. So a user created here gets no password: the
+ * `password_hash` column is NOT NULL, and what goes in it is
+ * `NO_PASSWORD_WILL_MATCH` ("!", the Unix locked-account convention), the
+ * same sentinel `db/seed/users.ts` has always seeded — a value no hash
+ * function produces and no input can ever match. See schema.ts's own
+ * comment on `app_user.passwordHash`. What this module guarantees beyond
+ * that is the same thing every other write in the engine guarantees: an
+ * audit-logged, single-transaction write (D30).
  *
  * **The bootstrap problem, and how it's resolved:** every other write in
  * this app is audit-logged against an actor who already exists — but the
@@ -25,6 +29,7 @@ import { statement, type EngineDb } from "./types";
 import { InvalidStatusError } from "./errors";
 import { auditStatement } from "./audit";
 import { nextRowId } from "./ids";
+import { NO_PASSWORD_WILL_MATCH } from "../../db/seed/users";
 
 const VALID_ROLES: readonly UserRole[] = ["admin", "bookkeeper", "reviewer"];
 
@@ -54,7 +59,7 @@ export async function createUser(db: EngineDb, input: CreateUserInput) {
   const row = {
     id,
     username: input.username.trim(),
-    passwordHash: null,
+    passwordHash: NO_PASSWORD_WILL_MATCH,
     fullName: input.fullName.trim(),
     position: input.position?.trim() || null,
     role: input.role,

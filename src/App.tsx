@@ -47,16 +47,28 @@ type Session =
  * landing on the picker.
  */
 type Screen =
-  | { name: "select" }
+  /**
+   * `resume` is a period the picker had already opened, handed back by a
+   * register's Back so the selection screen returns to that opened card
+   * instead of resetting to empty pickers. `SelectRecords` re-reads the
+   * period from the database rather than trusting this payload, so a period
+   * closed while she was away still shows as closed.
+   */
+  | { name: "select"; resume?: OpenedBooks }
   | ({ name: "journal" } & OpenedBooks)
   | ({ name: "fixedAssets" } & OpenedBooks)
   | ({ name: "advances" } & OpenedBooks)
   | ({ name: "bankReconciliation" } & OpenedBooks)
   | ({ name: "signatories" } & OpenedBooks)
-  /** Not barangay-scoped (D9 — one chart shared by all 54 barangays), unlike every other register. */
-  | { name: "chartOfAccounts" }
+  /**
+   * Not barangay-scoped (D9 — one chart shared by all 54 barangays), unlike
+   * every other register. It still carries `resume` though: it is reachable
+   * with a period open, and Back should not throw that selection away just
+   * because this screen has no use for it itself.
+   */
+  | { name: "chartOfAccounts"; resume?: OpenedBooks }
   /** Administrator-only (D24), reached the same way `chartOfAccounts` is — not barangay-scoped either. */
-  | { name: "userAdmin" }
+  | { name: "userAdmin"; resume?: OpenedBooks }
   | ({
       name: "reports";
       from: "select" | "journal" | "fixedAssets" | "advances" | "bankReconciliation";
@@ -172,6 +184,7 @@ function App({ db }: { db: Promise<EngineDb> }) {
         screen.name === "select" ? (
           <SelectRecords
             db={bootstrap.db}
+            resume={screen.resume}
             currentUserId={session.user.id}
             currentUserRole={session.user.role}
             onOpenBooks={(opened) => setScreen({ name: "journal", ...opened })}
@@ -180,8 +193,10 @@ function App({ db }: { db: Promise<EngineDb> }) {
             onOpenAdvances={(opened) => setScreen({ name: "advances", ...opened })}
             onOpenBankReconciliation={(opened) => setScreen({ name: "bankReconciliation", ...opened })}
             onOpenSignatories={(opened) => setScreen({ name: "signatories", ...opened })}
-            onOpenChartOfAccounts={() => setScreen({ name: "chartOfAccounts" })}
-            onOpenUserAdmin={() => setScreen({ name: "userAdmin" })}
+            onOpenChartOfAccounts={(opened) =>
+              setScreen({ name: "chartOfAccounts", resume: opened ?? undefined })
+            }
+            onOpenUserAdmin={(opened) => setScreen({ name: "userAdmin", resume: opened ?? undefined })}
           />
         ) : screen.name === "journal" ? (
           <JournalVoucher
@@ -194,8 +209,32 @@ function App({ db }: { db: Promise<EngineDb> }) {
             status={screen.status}
             currentUserId={session.user.id}
             currentUserRole={session.user.role}
-            onOpenUserAdmin={() => setScreen({ name: "userAdmin" })}
-            onBack={() => setScreen({ name: "select" })}
+            onOpenUserAdmin={() =>
+              setScreen({
+                name: "userAdmin",
+                resume: {
+                  barangayId: screen.barangayId,
+                  barangayName: screen.barangayName,
+                  periodId: screen.periodId,
+                  year: screen.year,
+                  month: screen.month,
+                  status: screen.status,
+                },
+              })
+            }
+            onBack={() =>
+              setScreen({
+                name: "select",
+                resume: {
+                  barangayId: screen.barangayId,
+                  barangayName: screen.barangayName,
+                  periodId: screen.periodId,
+                  year: screen.year,
+                  month: screen.month,
+                  status: screen.status,
+                },
+              })
+            }
             onViewReports={() =>
               setScreen({
                 name: "reports",
@@ -212,7 +251,19 @@ function App({ db }: { db: Promise<EngineDb> }) {
             onOpenAdvances={() => setScreen({ ...screen, name: "advances" })}
             onOpenBankReconciliation={() => setScreen({ ...screen, name: "bankReconciliation" })}
             onOpenSignatories={() => setScreen({ ...screen, name: "signatories" })}
-            onOpenChartOfAccounts={() => setScreen({ name: "chartOfAccounts" })}
+            onOpenChartOfAccounts={() =>
+              setScreen({
+                name: "chartOfAccounts",
+                resume: {
+                  barangayId: screen.barangayId,
+                  barangayName: screen.barangayName,
+                  periodId: screen.periodId,
+                  year: screen.year,
+                  month: screen.month,
+                  status: screen.status,
+                },
+              })
+            }
           />
         ) : screen.name === "fixedAssets" ? (
           <FixedAssets
@@ -220,7 +271,19 @@ function App({ db }: { db: Promise<EngineDb> }) {
             barangayId={screen.barangayId}
             barangayName={screen.barangayName}
             currentUserId={session.user.id}
-            onBack={() => setScreen({ name: "select" })}
+            onBack={() =>
+              setScreen({
+                name: "select",
+                resume: {
+                  barangayId: screen.barangayId,
+                  barangayName: screen.barangayName,
+                  periodId: screen.periodId,
+                  year: screen.year,
+                  month: screen.month,
+                  status: screen.status,
+                },
+              })
+            }
             onViewSchedule={() =>
               setScreen({
                 name: "reports",
@@ -241,7 +304,19 @@ function App({ db }: { db: Promise<EngineDb> }) {
             barangayId={screen.barangayId}
             barangayName={screen.barangayName}
             currentUserId={session.user.id}
-            onBack={() => setScreen({ name: "select" })}
+            onBack={() =>
+              setScreen({
+                name: "select",
+                resume: {
+                  barangayId: screen.barangayId,
+                  barangayName: screen.barangayName,
+                  periodId: screen.periodId,
+                  year: screen.year,
+                  month: screen.month,
+                  status: screen.status,
+                },
+              })
+            }
             onViewSchedule={() =>
               setScreen({
                 name: "reports",
@@ -265,7 +340,19 @@ function App({ db }: { db: Promise<EngineDb> }) {
             year={screen.year}
             month={screen.month}
             currentUserId={session.user.id}
-            onBack={() => setScreen({ name: "select" })}
+            onBack={() =>
+              setScreen({
+                name: "select",
+                resume: {
+                  barangayId: screen.barangayId,
+                  barangayName: screen.barangayName,
+                  periodId: screen.periodId,
+                  year: screen.year,
+                  month: screen.month,
+                  status: screen.status,
+                },
+              })
+            }
             onViewStatement={() =>
               setScreen({
                 name: "reports",
@@ -286,12 +373,32 @@ function App({ db }: { db: Promise<EngineDb> }) {
             barangayId={screen.barangayId}
             barangayName={screen.barangayName}
             currentUserId={session.user.id}
-            onBack={() => setScreen({ name: "select" })}
+            onBack={() =>
+              setScreen({
+                name: "select",
+                resume: {
+                  barangayId: screen.barangayId,
+                  barangayName: screen.barangayName,
+                  periodId: screen.periodId,
+                  year: screen.year,
+                  month: screen.month,
+                  status: screen.status,
+                },
+              })
+            }
           />
         ) : screen.name === "chartOfAccounts" ? (
-          <ChartOfAccountsAdmin db={bootstrap.db} currentUserId={session.user.id} onBack={() => setScreen({ name: "select" })} />
+          <ChartOfAccountsAdmin
+            db={bootstrap.db}
+            currentUserId={session.user.id}
+            onBack={() => setScreen({ name: "select", resume: screen.resume })}
+          />
         ) : screen.name === "userAdmin" ? (
-          <UserAdmin db={bootstrap.db} currentUserId={session.user.id} onBack={() => setScreen({ name: "select" })} />
+          <UserAdmin
+            db={bootstrap.db}
+            currentUserId={session.user.id}
+            onBack={() => setScreen({ name: "select", resume: screen.resume })}
+          />
         ) : (
           <Reports
             db={bootstrap.db}
@@ -341,7 +448,17 @@ function App({ db }: { db: Promise<EngineDb> }) {
                           month: screen.month,
                           status: screen.status,
                         })
-                      : setScreen({ name: "select" })
+                      : setScreen({
+                          name: "select",
+                          resume: {
+                            barangayId: screen.barangayId,
+                            barangayName: screen.barangayName,
+                            periodId: screen.periodId,
+                            year: screen.year,
+                            month: screen.month,
+                            status: screen.status,
+                          },
+                        })
             }
           />
         )

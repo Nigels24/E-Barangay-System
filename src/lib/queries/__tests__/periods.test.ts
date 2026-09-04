@@ -9,6 +9,7 @@ import { accountingPeriod, auditLog } from "../../../db/schema";
 import {
   countPeriodEntries,
   openPeriodSummary,
+  periodSummaryById,
   closePeriodAction,
   reopenPeriodAction,
   InvalidPeriodSelectionError,
@@ -200,5 +201,66 @@ describe("reopenPeriodAction", () => {
     // Still closed — the refused attempts wrote nothing.
     const row = await db.query.select().from(accountingPeriod).where(eq(accountingPeriod.id, periods.jan2024.id)).get();
     expect(row?.status).toBe("closed");
+  });
+});
+
+describe("periodSummaryById", () => {
+  it("returns the period and its entry count for an id that exists", async () => {
+    const { db, barangay, user, accounts, periods } = await seedEngineFixture();
+    const draft = await createDraftEntry(db, {
+      barangayId: barangay.id,
+      periodId: periods.jan2024.id,
+      entryDate: "2024-01-31",
+      book: "GJ",
+      particulars: "Payment of electric bill",
+      createdBy: user.id,
+      lines: [
+        { accountId: accounts.electricity.id, side: "debit", amountCentavos: toCentavos(15931.28) },
+        { accountId: accounts.cashInBank.id, side: "credit", amountCentavos: toCentavos(15931.28) },
+      ],
+    });
+    await postEntry(db, { entryId: draft.id, postedBy: user.id });
+
+    const summary = await periodSummaryById(db, periods.jan2024.id);
+
+    expect(summary.periodId).toBe(periods.jan2024.id);
+    expect(summary.barangayId).toBe(barangay.id);
+    expect(summary.year).toBe(2024);
+    expect(summary.month).toBe(1);
+    expect(summary.status).toBe("open");
+    expect(summary.entryCount).toBe(1);
+  });
+
+  it("reports a closed period as closed, so a resumed card cannot claim it is open", async () => {
+    const { db, periods, admin } = await seedEngineFixture();
+    await closePeriod(db, periods.jan2024.id, admin.id);
+
+    const summary = await periodSummaryById(db, periods.jan2024.id);
+    expect(summary.status).toBe("closed");
+  });
+
+  it("throws for an id that does not exist", async () => {
+    const { db } = await seedEngineFixture();
+    await expect(periodSummaryById(db, 9999)).rejects.toThrow(InvalidPeriodSelectionError);
+  });
+
+  /**
+   * The reason this function exists at all, rather than the resume path
+   * reusing `openPeriodSummary`. That one goes through `ensurePeriod()` and
+   * creates a period that is not there; this one must only ever read.
+   * SYSTEM_FLOW.md's open risks already carry one `accounting_period` row
+   * nobody can account for, on a table with no append-only trigger — a
+   * resume path that could mint another would make that worse.
+   */
+  it("never creates a period row — neither for an id that exists nor one that does not", async () => {
+    const { db, periods } = await seedEngineFixture();
+    const before = await db.query.select().from(accountingPeriod).all();
+
+    await periodSummaryById(db, periods.jan2024.id);
+    await expect(periodSummaryById(db, 9999)).rejects.toThrow(InvalidPeriodSelectionError);
+
+    const after = await db.query.select().from(accountingPeriod).all();
+    expect(after).toHaveLength(before.length);
+    expect(after.map((r) => r.id).sort()).toEqual(before.map((r) => r.id).sort());
   });
 });

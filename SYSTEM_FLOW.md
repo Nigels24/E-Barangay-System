@@ -111,13 +111,20 @@ guess a query makes — it is whoever is signed in, threaded down from
 Login here (per D24, confirmed again by the schema's own comment on
 `app_user.passwordHash`) is a name/role picker, not a password: one shared
 office PC, and a password checked against nobody in particular buys no
-real security, only friction. `password_hash` moves from `NOT NULL` to
-nullable (`drizzle/0005_messy_clea.sql`, a full table rebuild — SQLite's
-only way to drop a `NOT NULL`, same pattern every prior migration in this
-project uses) rather than being dropped, since a future password-based
-login would want the column back at no cost, and the one historical row
-that ever had a value there (the D32 placeholder actor) keeps it — D11
-never relabels a historical record, even cosmetically.
+real security, only friction. `password_hash` stays — a future
+password-based login would want the column back at no cost — and stays
+`NOT NULL`, carrying the `NO_PASSWORD_WILL_MATCH` sentinel ("!", the Unix
+locked-account convention) that `db/seed/users.ts` had already established
+for the D32 placeholder actor.
+
+**Corrected after T-018 first closed:** this originally made the column
+nullable via `drizzle/0005_messy_clea.sql`, a generated table rebuild.
+That migration could never apply — it failed with a 787 on the `DROP`
+against the seven FKs referencing `app_user`, and no in-transaction fix
+exists (see "Open risks"). It was deleted, `schema.ts` was returned to
+`NOT NULL`, and `createUser()` now writes the same sentinel the seed does.
+The database shape never changed, so nothing historical was relabelled
+(D11); only the plan for it did.
 
 - `src/lib/engine/users.ts` (new) — `createUser()` and `setUserActive()`,
   the same audit-logged, single-transaction write shape every other engine
@@ -816,6 +823,7 @@ waiting on the client" list below, or whatever the user asks for next.
 | **UI has zero automated coverage** — no React testing library, by choice | Passing tests say nothing about whether a screen is legible or visible | Every UI task gets looked at by eye; the Reviewer's §4b is not optional |
 | **Provisional-account badge (D12) has never rendered on screen** | Covered at the data layer, by nothing visually | Needs a period with posted activity on a `PENDING-*` account |
 | **`void.ts` doesn't validate `reversalDate` falls within the reversal period's month** (unlike `postEntry`, which checks this) | A caller that bypasses the UI's date clamp could theoretically post a reversal dated outside its own period | Currently closed defensively at the UI layer only (T-010's `min`/`max` clamp on the reversal-date field) — engine itself still has the gap. Worth a proper fix in `void.ts` before any second caller of `voidEntry` exists |
+| **A generated migration that rebuilds a referenced table cannot be shipped as generated** | drizzle-kit emits a table rebuild (`PRAGMA foreign_keys=OFF`, create `__new_*`, copy, `DROP`, rename) for any SQLite column-constraint change, but that pragma is a no-op inside sqlx's per-migration transaction, so the `DROP` fails with a 787 against every FK pointing at the table. `PRAGMA defer_foreign_keys=ON` does not fix it — it only moves the same failure from the `DROP` to the `COMMIT`, since the implicit `DELETE FROM` orphans the children and renaming a table into place never decrements the deferred counter. And tauri-plugin-sql 2.4.0 hardcodes `no_tx=false`, so there is no way to run one outside a transaction. `0004_gifted_spencer_smythe.sql` carries this same latent bug and applied cleanly only because nothing references `signatory`. | **Standing constraint on the schema, not a one-off bug**: a column-constraint change on a referenced table (`app_user` has 7 FKs pointing at it) needs a different approach entirely — not a hand-edit of the generated SQL. This is why `app_user.password_hash` stays NOT NULL and carries the `NO_PASSWORD_WILL_MATCH` sentinel (D24) instead of being made nullable; the attempt to relax it was abandoned and its migration deleted. Verify any future rebuild by replaying it against a copy of the real database before shipping |
 
 ---
 

@@ -3,6 +3,7 @@ import { createTestDb } from "../../../db/testDb";
 import { createUser, setUserActive } from "../users";
 import { InvalidStatusError } from "../errors";
 import { auditLog } from "../../../db/schema";
+import { NO_PASSWORD_WILL_MATCH } from "../../../db/seed/users";
 import { eq } from "drizzle-orm";
 
 describe("createUser", () => {
@@ -17,7 +18,12 @@ describe("createUser", () => {
     });
 
     expect(first.id).toBeGreaterThan(0);
-    expect(first.passwordHash).toBeNull();
+    // A created user has no usable password. That rule is unchanged; only its
+    // representation is — the sentinel "!" rather than a null, because
+    // `password_hash` is NOT NULL (D24, see schema.ts's comment on the column).
+    // Asserting the sentinel specifically is what keeps this a real check: any
+    // value that a password could hash to would fail it.
+    expect(first.passwordHash).toBe(NO_PASSWORD_WILL_MATCH);
     expect(first.isActive).toBe(true);
 
     const audit = await db.query.select().from(auditLog).where(eq(auditLog.tableName, "app_user")).all();

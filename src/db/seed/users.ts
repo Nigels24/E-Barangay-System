@@ -30,14 +30,20 @@ export const PLACEHOLDER_USER_USERNAME = "placeholder-bookkeeper";
 export const PLACEHOLDER_USER_FULL_NAME = "Placeholder Bookkeeper (no login yet)";
 
 /**
- * There is no login screen, no password check, and no hashing code in this
- * app yet. `password_hash` is NOT NULL, so it needs *something* — and the
- * something is deliberately not a hash. No hash function produces "!", so
- * whatever verifier Phase 5 brings, this value cannot match a password;
- * the placeholder therefore cannot become a back door if login lands before
- * anyone remembers to remove it.
+ * What goes in `password_hash` for an account that has no password.
+ *
+ * Login in this app is a name/role picker, never a password (D24) — but
+ * `password_hash` is NOT NULL, so every row needs *something*, and the
+ * something is deliberately not a hash. "!" is the Unix locked-account
+ * convention: no hash function produces it, so whatever verifier a future
+ * password-based login might bring, this value cannot match any input. An
+ * account carrying it therefore cannot become a back door if login ever
+ * lands before anyone remembers to remove it.
+ *
+ * Shared, not re-declared: `lib/engine/users.ts` writes this same sentinel
+ * for every real user it creates. One definition, one meaning.
  */
-const NO_PASSWORD_WILL_MATCH = "!";
+export const NO_PASSWORD_WILL_MATCH = "!";
 
 /** Inserts the placeholder user if it is not already there. Safe on every startup. */
 export async function seedPlaceholderUser(db: EngineDb) {

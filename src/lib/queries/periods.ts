@@ -11,7 +11,7 @@
  * logic that lives in a component is not.
  */
 import { count, eq } from "drizzle-orm";
-import { journalEntry, type PeriodStatus } from "../../db/schema";
+import { accountingPeriod, journalEntry, type PeriodStatus } from "../../db/schema";
 import { closePeriod, ensurePeriod, reopenPeriod } from "../engine/period";
 import type { EngineDb } from "../engine/types";
 
@@ -103,6 +103,35 @@ export async function openPeriodSummary(
   assertSelection(barangayId, year, month);
 
   const period = await ensurePeriod(db, barangayId, year, month);
+  return toSummary(db, period);
+}
+
+/**
+ * Reads an existing period by its primary key, for a screen returning to a
+ * selection it already made.
+ *
+ * **This exists so that the resume path cannot create a period.**
+ * `openPeriodSummary()` goes through `ensurePeriod()`, which creates a row
+ * when none exists — correct when a bookkeeper deliberately picks a month
+ * and presses Proceed, and wrong for every path that is only restoring a
+ * period already opened earlier. Reusing it to resume would mean a stray
+ * `periodId` silently minting a period row nobody chose. SYSTEM_FLOW.md's
+ * open risks already carry "One `accounting_period` row nobody has
+ * accounted for", on a table with no append-only trigger behind it; this
+ * function is a read, and a read cannot add to that.
+ *
+ * Throws `InvalidPeriodSelectionError` when no such period exists, rather
+ * than creating one.
+ */
+export async function periodSummaryById(db: EngineDb, periodId: number): Promise<PeriodSummary> {
+  const period = await db.query
+    .select()
+    .from(accountingPeriod)
+    .where(eq(accountingPeriod.id, periodId))
+    .get();
+  if (!period) {
+    throw new InvalidPeriodSelectionError(`No accounting period with id ${periodId} exists.`);
+  }
   return toSummary(db, period);
 }
 

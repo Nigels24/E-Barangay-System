@@ -468,16 +468,27 @@ export const appUser = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     username: text("username").notNull().unique(),
     /**
-     * Nullable (D24/T-018): login here is a name/role picker, not a
-     * password — the office shares one PC and a password checked against
+     * Vestigial, and NOT NULL (D24): login here is a name/role picker, not
+     * a password — the office shares one PC and a password checked against
      * nobody in particular buys no real security, only friction. The
      * column stays, unused, rather than being dropped: it costs nothing to
-     * keep, and a future password-based login would want it back. The one
-     * historical row that ever had a value here (the D32 placeholder
-     * actor) keeps it — D11 never relabels a historical record, even
-     * cosmetically.
+     * keep, and a future password-based login would want it back.
+     *
+     * Since no account has a password, every row carries the sentinel
+     * `NO_PASSWORD_WILL_MATCH` ("!", the Unix locked-account convention —
+     * see `db/seed/users.ts`, which defines it, and `lib/engine/users.ts`,
+     * which writes it for every real user). A sentinel rather than a null
+     * because it says the true thing — "this account has no usable
+     * password" — where a null only says "unknown", and because it cannot
+     * become a back door if password login ever lands.
+     *
+     * It stays NOT NULL for a hard practical reason, not a stylistic one:
+     * relaxing it needs a SQLite table rebuild, and `app_user` is
+     * referenced by seven foreign keys, which makes that rebuild
+     * unshippable through this project's migration runner. See
+     * SYSTEM_FLOW.md's "Open risks" before proposing to change it.
      */
-    passwordHash: text("password_hash"),
+    passwordHash: text("password_hash").notNull(),
     fullName: text("full_name").notNull(),
     position: text("position"),
     role: text("role").$type<UserRole>().notNull(),
